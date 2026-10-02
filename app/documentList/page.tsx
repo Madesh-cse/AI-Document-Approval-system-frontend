@@ -1,91 +1,27 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
+
 import DashboardSidebar from "@/components/Dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/Dashboard/DashboardHeader";
 
-type DocumentStatus =
-  | "draft"
-  | "processing"
-  | "pending_review"
-  | "approved"
-  | "rejected";
+import {
+  getDocuments,
+  type DocumentItem,
+  type DocumentCategory,
+  type DocumentStatus,
+} from "@/services/documentService";
 
-type DocumentCategory =
-  | "invoice"
-  | "insurance_policy"
-  | "purchase_order"
-  | "expense_report"
-  | "financial_statement"
-  | "contract"
-  | "unsupported";
+function formatCategory(category: DocumentCategory | null) {
+  if (!category) {
+    return "—";
+  }
 
-interface DocumentItem {
-  id: number;
-  title: string;
-  file_name: string;
-  category: DocumentCategory;
-  uploaded_by: string;
-  date: string;
-  amount?: number;
-  currency?: string;
-  guardrail_passed?: boolean;
-  status: DocumentStatus;
-}
-
-const documents: DocumentItem[] = [
-  {
-    id: 3,
-    title: "Invoice INV-2026-0587",
-    file_name: "invoice_0587.pdf",
-    category: "invoice",
-    uploaded_by: "Madesh",
-    date: "Sep 25, 2026",
-    amount: 153400,
-    currency: "INR",
-    guardrail_passed: true,
-    status: "pending_review",
-  },
-  {
-    id: 2,
-    title: "Purchase Order PO-3391",
-    file_name: "purchase_order_3391.pdf",
-    category: "purchase_order",
-    uploaded_by: "Madesh",
-    date: "Sep 24, 2026",
-    amount: 212000,
-    currency: "INR",
-    guardrail_passed: true,
-    status: "processing",
-  },
-  {
-    id: 4,
-    title: "Contract CNT-221",
-    file_name: "contract_221.pdf",
-    category: "contract",
-    uploaded_by: "Priya",
-    date: "Sep 21, 2026",
-    guardrail_passed: false,
-    status: "rejected",
-  },
-  {
-    id: 5,
-    title: "Invoice INV-1023",
-    file_name: "invoice_1023.pdf",
-    category: "invoice",
-    uploaded_by: "Arun",
-    date: "Sep 22, 2026",
-    amount: 75500,
-    currency: "INR",
-    guardrail_passed: true,
-    status: "approved",
-  },
-];
-
-const formatCategory = (category: DocumentCategory) => {
   const labels: Record<DocumentCategory, string> = {
     invoice: "Invoice",
-    insurance_policy: "Insurance Policy",
+    insurance_policy: "Insurance",
     purchase_order: "Purchase Order",
     expense_report: "Expense Report",
     financial_statement: "Financial Statement",
@@ -94,29 +30,133 @@ const formatCategory = (category: DocumentCategory) => {
   };
 
   return labels[category];
-};
+}
 
-const formatAmount = (
-  amount?: number,
-  currency?: string,
-) => {
-  if (amount === undefined) {
+function formatDate(date: string) {
+  if (!date) {
+    return "—";
+  }
+
+  return new Date(date).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function getDocumentIdentifier(document: DocumentItem) {
+  const data = document.extracted_data;
+
+  if (!data) {
+    return null;
+  }
+
+  const identifier =
+    data.invoice_number ??
+    data.policy_number ??
+    data.purchase_order_number ??
+    data.report_number ??
+    data.contract_number;
+
+  if (typeof identifier === "string" && identifier.trim()) {
+    return identifier;
+  }
+
+  return null;
+}
+
+function getDocumentTitle(document: DocumentItem) {
+  const identifier = getDocumentIdentifier(document);
+
+  if (identifier) {
+    return identifier;
+  }
+
+  return document.title || document.file_name;
+}
+
+function getDocumentAmount(document: DocumentItem) {
+  const data = document.extracted_data;
+
+  if (!data) {
+    return null;
+  }
+
+  switch (document.document_category) {
+    case "invoice":
+      return {
+        amount: data.total_amount,
+        currency: data.currency,
+      };
+
+    case "purchase_order":
+      return {
+        amount: data.total_amount,
+        currency: data.currency,
+      };
+
+    case "expense_report":
+      return {
+        amount: data.reimbursable_amount,
+        currency: data.currency,
+      };
+
+    case "insurance_policy":
+      return {
+        amount: data.premium,
+        currency: data.currency,
+      };
+
+    case "financial_statement":
+      return {
+        amount: data.net_income,
+        currency: data.currency,
+      };
+
+    case "contract":
+      return {
+        amount: data.contract_value,
+        currency: data.currency,
+      };
+
+    default:
+      return null;
+  }
+}
+
+function formatAmount(
+  amount: unknown,
+  currency: unknown,
+) {
+  if (typeof amount !== "number") {
     return "—";
   }
 
   if (currency === "INR") {
-    return `₹${amount.toLocaleString("en-IN")}`;
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 0,
+    }).format(amount);
   }
 
-  return `${currency ?? ""} ${amount.toLocaleString()}`;
-};
+  if (typeof currency === "string" && currency.trim()) {
+    return `${currency} ${amount.toLocaleString()}`;
+  }
+
+  return amount.toLocaleString();
+}
+
+function getUploadedBy(document: DocumentItem) {
+  return `User #${document.uploaded_by}`;
+}
 
 function ValidationBadge({
   passed,
 }: {
-  passed?: boolean;
+  passed: boolean | null;
 }) {
-  if (passed) {
+  if (passed === true) {
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-600">
         <span className="flex h-4 w-4 items-center justify-center rounded-full border border-emerald-400">
@@ -127,12 +167,20 @@ function ValidationBadge({
     );
   }
 
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-600">
-      <span className="flex h-4 w-4 items-center justify-center rounded-full border border-amber-400">
-        !
+  if (passed === false) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-medium text-red-600">
+        <span className="flex h-4 w-4 items-center justify-center rounded-full border border-red-400">
+          ×
+        </span>
+        Failed
       </span>
-      Review Required
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-500">
+      —
     </span>
   );
 }
@@ -186,40 +234,64 @@ function StatusBadge({
 }
 
 export default function DocumentsPage() {
+  const router = useRouter();
+
   const [activeTab, setActiveTab] = useState("all");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const {
+    data,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
+    queryKey: ["documents"],
+    queryFn: getDocuments,
+  });
+
+  const documents = data?.documents ?? [];
 
   const filteredDocuments = useMemo(() => {
     if (activeTab === "invoices") {
       return documents.filter(
-        (document) => document.category === "invoice",
+        (document) =>
+          document.document_category === "invoice",
       );
     }
 
     if (activeTab === "contracts") {
       return documents.filter(
-        (document) => document.category === "contract",
+        (document) =>
+          document.document_category === "contract",
       );
     }
 
     if (activeTab === "processing") {
       return documents.filter(
-        (document) => document.status === "processing",
+        (document) =>
+          document.status === "processing",
       );
     }
 
     return documents;
-  }, [activeTab]);
+  }, [activeTab, documents]);
 
   return (
     <div className="min-h-screen bg-[#f8fafc]">
+      {/* Sidebar */}
       <DashboardSidebar
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
+
+      {/* Main application */}
       <div className="lg:pl-62.5">
-        <DashboardHeader onMenuClick={() => setSidebarOpen(true)} />
-        {/* Documents Content */}
+        {/* Header */}
+        <DashboardHeader
+          onMenuClick={() => setSidebarOpen(true)}
+        />
+
+        {/* Content */}
         <main className="px-7 py-7">
           {/* Page heading */}
           <div className="mb-7 flex items-start justify-between">
@@ -229,8 +301,8 @@ export default function DocumentsPage() {
               </h1>
 
               <p className="mt-1.5 text-sm text-[#64748b]">
-                Every document ingested by DocIntel AI, with extraction and
-                validation results.
+                Every document ingested by DocIntel AI,
+                with extraction and validation results.
               </p>
             </div>
 
@@ -255,159 +327,267 @@ export default function DocumentsPage() {
             </button>
           </div>
 
-          {/* Document table card */}
-          <div className="rounded-xl border border-[#e5e7eb] bg-white shadow-sm">
-            {/* Tabs */}
-            <div className="flex items-center gap-1 border-b border-[#e5e7eb] px-4 pt-3">
-              {[
-                { id: "all", label: "All" },
-                { id: "invoices", label: "Invoices" },
-                { id: "contracts", label: "Contracts" },
-                { id: "processing", label: "Processing" },
-              ].map((tab) => {
-                const active = activeTab === tab.id;
+          {/* Loading */}
+          {isLoading && (
+            <div className="rounded-xl border border-[#e5e7eb] bg-white p-12 text-center shadow-sm">
+              <div className="mx-auto mb-3 h-6 w-6 animate-spin rounded-full border-2 border-[#315bdc] border-t-transparent" />
 
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`rounded-t-lg px-4 py-3 text-sm font-medium transition ${
-                      active
-                        ? "border border-b-white border-[#e5e7eb] bg-white text-[#315bdc]"
-                        : "text-[#64748b] hover:text-[#111827]"
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                );
-              })}
+              <p className="text-sm text-[#64748b]">
+                Loading documents...
+              </p>
             </div>
+          )}
 
-            {/* Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-262.5 border-collapse">
-                <thead>
-                  <tr className="border-b border-[#e5e7eb] bg-[#fafbfc]">
-                    <th className="px-4 py-3.5 text-left text-xs font-medium text-[#64748b]">
-                      Document
-                    </th>
+          {/* Error */}
+          {isError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-6">
+              <p className="text-sm font-medium text-red-600">
+                Failed to load documents.
+              </p>
 
-                    <th className="px-4 py-3.5 text-left text-xs font-medium text-[#64748b]">
-                      Type
-                    </th>
+              <p className="mt-1 text-xs text-red-500">
+                Please try again.
+              </p>
 
-                    <th className="px-4 py-3.5 text-left text-xs font-medium text-[#64748b]">
-                      Uploaded By
-                    </th>
+              <button
+                type="button"
+                onClick={() => refetch()}
+                className="mt-4 rounded-lg bg-red-600 px-4 py-2 text-xs font-medium text-white hover:bg-red-700"
+              >
+                Try Again
+              </button>
+            </div>
+          )}
 
-                    <th className="px-4 py-3.5 text-left text-xs font-medium text-[#64748b]">
-                      Date
-                    </th>
+          {/* Document table */}
+          {!isLoading && !isError && (
+            <div className="rounded-xl border border-[#e5e7eb] bg-white shadow-sm">
+              {/* Tabs */}
+              <div className="flex items-center gap-1 border-b border-[#e5e7eb] px-4 pt-3">
+                {[
+                  {
+                    id: "all",
+                    label: "All",
+                  },
+                  {
+                    id: "invoices",
+                    label: "Invoices",
+                  },
+                  {
+                    id: "contracts",
+                    label: "Contracts",
+                  },
+                  {
+                    id: "processing",
+                    label: "Processing",
+                  },
+                ].map((tab) => {
+                  const active = activeTab === tab.id;
 
-                    <th className="px-4 py-3.5 text-left text-xs font-medium text-[#64748b]">
-                      Amount
-                    </th>
-
-                    <th className="px-4 py-3.5 text-left text-xs font-medium text-[#64748b]">
-                      AI Validation
-                    </th>
-
-                    <th className="px-4 py-3.5 text-left text-xs font-medium text-[#64748b]">
-                      Status
-                    </th>
-
-                    <th className="px-4 py-3.5 text-left text-xs font-medium text-[#64748b]">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {filteredDocuments.map((document) => (
-                    <tr
-                      key={document.id}
-                      className="border-b border-[#eef0f3] last:border-b-0 hover:bg-[#fafcff]"
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() =>
+                        setActiveTab(tab.id)
+                      }
+                      className={`rounded-t-lg px-4 py-3 text-sm font-medium transition ${
+                        active
+                          ? "border border-b-white border-[#e5e7eb] bg-white text-[#315bdc]"
+                          : "text-[#64748b] hover:text-[#111827]"
+                      }`}
                     >
-                      <td className="px-4 py-4">
-                        <div>
-                          <p className="text-sm font-medium text-[#111827]">
-                            {document.title}
-                          </p>
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
 
-                          <p className="mt-0.5 text-xs text-[#94a3b8]">
-                            {document.file_name}
-                          </p>
-                        </div>
-                      </td>
+              {/* Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-262.5 border-collapse">
+                  <thead>
+                    <tr className="border-b border-[#e5e7eb] bg-[#fafbfc]">
+                      <th className="px-4 py-3.5 text-left text-xs font-medium text-[#64748b]">
+                        Document
+                      </th>
 
-                      <td className="px-4 py-4 text-sm text-[#475569]">
-                        {formatCategory(document.category)}
-                      </td>
+                      <th className="px-4 py-3.5 text-left text-xs font-medium text-[#64748b]">
+                        Type
+                      </th>
 
-                      <td className="px-4 py-4 text-sm text-[#475569]">
-                        {document.uploaded_by}
-                      </td>
+                      <th className="px-4 py-3.5 text-left text-xs font-medium text-[#64748b]">
+                        Uploaded By
+                      </th>
 
-                      <td className="px-4 py-4 text-sm text-[#475569]">
-                        {document.date}
-                      </td>
+                      <th className="px-4 py-3.5 text-left text-xs font-medium text-[#64748b]">
+                        Date
+                      </th>
 
-                      <td className="px-4 py-4 text-sm font-medium text-[#111827]">
-                        {formatAmount(
-                          document.amount,
-                          document.currency,
-                        )}
-                      </td>
+                      <th className="px-4 py-3.5 text-left text-xs font-medium text-[#64748b]">
+                        Amount
+                      </th>
 
-                      <td className="px-4 py-4">
-                        <ValidationBadge
-                          passed={document.guardrail_passed}
-                        />
-                      </td>
+                      <th className="px-4 py-3.5 text-left text-xs font-medium text-[#64748b]">
+                        AI Validation
+                      </th>
 
-                      <td className="px-4 py-4">
-                        <StatusBadge status={document.status} />
-                      </td>
+                      <th className="px-4 py-3.5 text-left text-xs font-medium text-[#64748b]">
+                        Status
+                      </th>
 
-                      <td className="px-4 py-4">
-                        <button
-                          type="button"
-                          className="inline-flex items-center gap-1.5 text-sm font-medium text-[#475569] hover:text-[#315bdc]"
-                        >
-                          <svg
-                            width="17"
-                            height="17"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.8"
-                          >
-                            <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
-                            <circle cx="12" cy="12" r="2.5" />
-                          </svg>
-
-                          Review
-                        </button>
-                      </td>
+                      <th className="px-4 py-3.5 text-left text-xs font-medium text-[#64748b]">
+                        Actions
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
 
-              {filteredDocuments.length === 0 && (
-                <div className="px-6 py-16 text-center">
-                  <p className="text-sm font-medium text-[#475569]">
-                    No documents found
-                  </p>
+                  <tbody>
+                    {filteredDocuments.map(
+                      (document) => {
+                        const amountInfo =
+                          getDocumentAmount(
+                            document,
+                          );
 
-                  <p className="mt-1 text-xs text-[#94a3b8]">
-                    There are no documents in this category.
-                  </p>
-                </div>
-              )}
+                        return (
+                          <tr
+                            key={document.id}
+                            className="border-b border-[#eef0f3] last:border-b-0 hover:bg-[#fafcff]"
+                          >
+                            {/* Document */}
+                            <td className="px-4 py-4">
+                              <div>
+                                <p className="text-sm font-medium text-[#111827]">
+                                  {getDocumentTitle(
+                                    document,
+                                  )}
+                                </p>
+
+                                <p className="mt-0.5 text-xs text-[#94a3b8]">
+                                  {document.file_name}
+                                </p>
+                              </div>
+                            </td>
+
+                            {/* Type */}
+                            <td className="px-4 py-4 text-sm text-[#475569]">
+                              {formatCategory(
+                                document.document_category,
+                              )}
+                            </td>
+
+                            {/* Uploaded By */}
+                            <td className="px-4 py-4 text-sm text-[#475569]">
+                              {getUploadedBy(
+                                document,
+                              )}
+                            </td>
+
+                            {/* Date */}
+                            <td className="px-4 py-4 text-sm text-[#475569]">
+                              {formatDate(
+                                document.created_at,
+                              )}
+                            </td>
+
+                            {/* Amount */}
+                            <td className="px-4 py-4 text-sm font-medium text-[#111827]">
+                              {amountInfo
+                                ? formatAmount(
+                                    amountInfo.amount,
+                                    amountInfo.currency,
+                                  )
+                                : "—"}
+                            </td>
+
+                            {/* AI Validation */}
+                            <td className="px-4 py-4">
+                              <ValidationBadge
+                                passed={
+                                  document.guardrail_passed
+                                }
+                              />
+                            </td>
+
+                            {/* Status */}
+                            <td className="px-4 py-4">
+                              <StatusBadge
+                                status={
+                                  document.status
+                                }
+                              />
+                            </td>
+
+                            {/* Actions */}
+                            <td className="px-4 py-4">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  router.push(
+                                    `/documentList/${document.id}`,
+                                  )
+                                }
+                                className="inline-flex items-center gap-1.5 text-sm font-medium text-[#475569] hover:text-[#315bdc]"
+                              >
+                                <svg
+                                  width="17"
+                                  height="17"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="1.8"
+                                >
+                                  <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
+
+                                  <circle
+                                    cx="12"
+                                    cy="12"
+                                    r="2.5"
+                                  />
+                                </svg>
+
+                                Review
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      },
+                    )}
+                  </tbody>
+                </table>
+
+                {/* Empty */}
+                {filteredDocuments.length === 0 && (
+                  <div className="px-6 py-16 text-center">
+                    <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[#f1f5f9]">
+                      <svg
+                        width="22"
+                        height="22"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#64748b"
+                        strokeWidth="1.8"
+                      >
+                        <path d="M6 2h9l3 3v17H6z" />
+
+                        <path d="M14 2v4h4" />
+                      </svg>
+                    </div>
+
+                    <p className="text-sm font-medium text-[#475569]">
+                      No documents found
+                    </p>
+
+                    <p className="mt-1 text-xs text-[#94a3b8]">
+                      There are no documents in this
+                      category.
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </main>
       </div>
     </div>

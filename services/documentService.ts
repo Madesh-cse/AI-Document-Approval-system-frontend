@@ -1,5 +1,21 @@
 import api from "@/lib/axios";
 
+export type DocumentStatus =
+  | "draft"
+  | "processing"
+  | "pending_review"
+  | "approved"
+  | "rejected";
+
+export type DocumentCategory =
+  | "invoice"
+  | "insurance_policy"
+  | "purchase_order"
+  | "expense_report"
+  | "financial_statement"
+  | "contract"
+  | "unsupported";
+
 export interface DocumentResponse {
   id: number;
   title: string;
@@ -7,19 +23,34 @@ export interface DocumentResponse {
   file_type: string;
   file_size: number;
   storage_path: string;
-  status:
-    | "draft"
-    | "processing"
-    | "pending_review"
-    | "approved"
-    | "rejected";
+
+  status: DocumentStatus;
+
+  document_category: DocumentCategory | null;
+
+  classification_confidence: string | null;
+  classification_reason: string | null;
+
+  extracted_data: Record<string, unknown> | null;
+
+  guardrail_passed: boolean | null;
+  guardrail_errors: string[] | null;
+
+  processing_error: string | null;
+
   uploaded_by: number;
+
   created_at: string;
   updated_at: string;
 }
 
+/**
+ * Alias used by the Documents UI.
+ */
+export type DocumentItem = DocumentResponse;
+
 export interface DocumentListResponse {
-  documents: DocumentResponse[];
+  documents: DocumentItem[];
   total: number;
 }
 
@@ -42,10 +73,13 @@ export async function uploadDocument(
   title?: string,
 ): Promise<DocumentResponse> {
   const formData = new FormData();
+
   formData.append("file", file);
+
   if (title?.trim()) {
     formData.append("title", title.trim());
   }
+
   const response = await api.post<DocumentResponse>(
     "/documents/upload",
     formData,
@@ -86,6 +120,26 @@ export async function askDocumentQuestion(
     {
       question,
     },
+  );
+
+  return response.data;
+}
+
+export async function approveDocument(
+  documentId: number,
+): Promise<DocumentResponse> {
+  const response = await api.post<DocumentResponse>(
+    `/documents/${documentId}/approve`,
+  );
+
+  return response.data;
+}
+
+export async function rejectDocument(
+  documentId: number,
+): Promise<DocumentResponse> {
+  const response = await api.post<DocumentResponse>(
+    `/documents/${documentId}/reject`,
   );
 
   return response.data;

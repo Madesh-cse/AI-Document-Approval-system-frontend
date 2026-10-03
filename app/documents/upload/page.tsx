@@ -8,7 +8,10 @@ import DashboardSidebar from "@/components/Dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/Dashboard/DashboardHeader";
 import { Icon } from "@/components/Dashboard/Icon";
 
-import { uploadDocument } from "@/services/documentService";
+import {
+  uploadDocument,
+  processDocument,
+} from "@/services/documentService";
 
 const TIMELINE_STEPS = [
   {
@@ -33,7 +36,11 @@ const TIMELINE_STEPS = [
   },
 ];
 
-const ALLOWED_FILE_TYPES = ["application/pdf", "image/jpeg", "image/png"];
+const ALLOWED_FILE_TYPES = [
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+];
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -74,7 +81,7 @@ export default function UploadDocumentPage() {
     setProcessing(true);
 
     try {
-      setCurrentStep(1);
+      setCurrentStep(0);
 
       const document = await uploadDocument(file);
 
@@ -82,12 +89,35 @@ export default function UploadDocumentPage() {
 
       setCurrentStep(1);
 
-      setSuccessMessage("Document uploaded successfully.");
+      const result = await processDocument(document.id);
+
+      console.log("Document processing result:", result);
+
+      if (result.status === "rejected") {
+        const guardrailMessage =
+          result.guardrail_errors?.length > 0
+            ? result.guardrail_errors.join(", ")
+            : result.reason || "Document processing was rejected.";
+
+        throw new Error(guardrailMessage);
+      }
+
+      if (!result.indexed) {
+        throw new Error(
+          "Document processing completed, but the document was not indexed for AI search.",
+        );
+      }
+
+      setCurrentStep(4);
+
+      setSuccessMessage(
+        "Document processed successfully and sent for approval.",
+      );
 
       setProcessing(false);
       setCompleted(true);
     } catch (error) {
-      console.error("Document upload failed:", error);
+      console.error("Document processing failed:", error);
 
       setProcessing(false);
       setCompleted(false);
@@ -102,17 +132,30 @@ export default function UploadDocumentPage() {
         }
 
         if (Array.isArray(detail)) {
-          setError(detail.map((item) => item.msg).join(", "));
-
+          setError(
+            detail
+              .map((item) => item.msg)
+              .filter(Boolean)
+              .join(", "),
+          );
           return;
         }
       }
 
-      setError("Unable to upload the document. Please try again.");
+      if (error instanceof Error) {
+        setError(error.message);
+        return;
+      }
+
+      setError(
+        "Unable to process the document. Please try again.",
+      );
     }
   };
 
-  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+  const handleDrop = (
+    event: React.DragEvent<HTMLDivElement>,
+  ) => {
     event.preventDefault();
     event.stopPropagation();
 
@@ -125,14 +168,18 @@ export default function UploadDocumentPage() {
     }
   };
 
-  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+  const handleDragOver = (
+    event: React.DragEvent<HTMLDivElement>,
+  ) => {
     event.preventDefault();
     event.stopPropagation();
 
     setIsDragging(true);
   };
 
-  const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+  const handleDragLeave = (
+    event: React.DragEvent<HTMLDivElement>,
+  ) => {
     event.preventDefault();
     event.stopPropagation();
 
@@ -147,7 +194,9 @@ export default function UploadDocumentPage() {
     input?.click();
   };
 
-  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = event.target.files?.[0];
 
     if (file) {
@@ -166,7 +215,9 @@ export default function UploadDocumentPage() {
         />
 
         <div className="flex min-h-screen flex-1 flex-col lg:pl-62.5">
-          <DashboardHeader onMenuClick={() => setSidebarOpen(true)} />
+          <DashboardHeader
+            onMenuClick={() => setSidebarOpen(true)}
+          />
 
           <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 px-4 py-8 sm:px-6">
             <section>
@@ -175,8 +226,8 @@ export default function UploadDocumentPage() {
               </h1>
 
               <p className="mt-1.5 text-sm text-slate-500 sm:text-base">
-                Add a business document and DocIntel AI will extract, validate
-                and route it.
+                Add a business document and DocIntel AI will
+                extract, validate and route it.
               </p>
             </section>
 
@@ -223,16 +274,25 @@ export default function UploadDocumentPage() {
                   />
 
                   <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-[#2563eb] transition-transform duration-200 group-hover:scale-105">
-                    <Icon name="upload" className="h-8 w-8" strokeWidth={1.8} />
+                    <Icon
+                      name="upload"
+                      className="h-8 w-8"
+                      strokeWidth={1.8}
+                    />
                   </div>
 
                   <h2 className="text-base font-semibold text-slate-800 sm:text-lg">
-                    {selectedFile ? selectedFile.name : "Upload your document"}
+                    {selectedFile
+                      ? selectedFile.name
+                      : "Upload your document"}
                   </h2>
 
                   <p className="mt-1 text-sm text-slate-500">
                     {selectedFile
-                      ? `${(selectedFile.size / (1024 * 1024)).toFixed(2)} MB`
+                      ? `${(
+                          selectedFile.size /
+                          (1024 * 1024)
+                        ).toFixed(2)} MB`
                       : "Drag and drop your PDF, JPG, or PNG here"}
                   </p>
 
@@ -247,16 +307,18 @@ export default function UploadDocumentPage() {
                   {selectedFile && (
                     <div className="mt-3 text-xs font-medium text-[#2563eb]">
                       {processing
-                        ? `Uploading: ${selectedFile.name}`
+                        ? `Processing: ${selectedFile.name}`
                         : completed
-                          ? `Uploaded successfully: ${selectedFile.name}`
+                          ? `Processed successfully: ${selectedFile.name}`
                           : selectedFile.name}
                     </div>
                   )}
                 </div>
 
                 <div className="mt-4 flex flex-col items-center justify-between gap-2 px-1 text-xs text-slate-400 sm:flex-row">
-                  <span>Supported formats: PDF, JPG, PNG</span>
+                  <span>
+                    Supported formats: PDF, JPG, PNG
+                  </span>
 
                   <span>Maximum file size: 20 MB</span>
                 </div>
@@ -281,9 +343,11 @@ export default function UploadDocumentPage() {
                 />
 
                 {TIMELINE_STEPS.map((step, index) => {
-                  const isComplete = completed || currentStep > index;
+                  const isComplete =
+                    completed || currentStep > index;
 
-                  const isActive = processing && currentStep === index;
+                  const isActive =
+                    processing && currentStep === index;
 
                   return (
                     <div

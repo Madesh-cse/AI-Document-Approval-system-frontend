@@ -79,6 +79,25 @@ export default function DashboardPage() {
     loadDashboard();
   }, [user, isReviewer]);
 
+  const dashboardStats = {
+    total_documents: documents.length,
+
+    pending_review: documents.filter(
+      (document) =>
+        document.status === "pending_review",
+    ).length,
+
+    approved: documents.filter(
+      (document) =>
+        document.status === "approved",
+    ).length,
+
+    rejected: documents.filter(
+      (document) =>
+        document.status === "rejected",
+    ).length,
+  };
+
   const recentDocuments = documents.map((document) => ({
     id: document.id,
     title: document.title,
@@ -119,7 +138,7 @@ export default function DashboardPage() {
               {!loading && !error && dashboard && (
                 <>
                   <DashboardStats
-                    stats={dashboard.stats}
+                    stats={dashboardStats}
                   />
 
                   <div className="mt-6">

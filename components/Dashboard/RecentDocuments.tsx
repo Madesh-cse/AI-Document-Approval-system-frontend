@@ -7,7 +7,6 @@ import type { RecentDocument } from "@/services/dashboardService";
 
 interface RecentDocumentsProps {
   documents: RecentDocument[];
-  /** Called when the eye / review button of a row is clicked */
   onReview?: (document: RecentDocument) => void;
 }
 
@@ -45,7 +44,6 @@ const STATUS: Record<RecentDocument["status"], StatusStyle> = {
   },
 };
 
-// Fallback if the API ever returns a status we don't know yet
 const getStatus = (status: string): StatusStyle =>
   STATUS[status as RecentDocument["status"]] ?? {
     label: status.replace(/_/g, " "),
@@ -53,7 +51,6 @@ const getStatus = (status: string): StatusStyle =>
     className: "border-slate-200 bg-slate-50 text-slate-600",
   };
 
-// "invoice_1024.pdf" -> "PDF"
 const getFileType = (fileName: string) => {
   const dot = fileName.lastIndexOf(".");
 
@@ -62,11 +59,12 @@ const getFileType = (fileName: string) => {
     : "—";
 };
 
-// "2026-09-23T10:15:00Z" -> "Sep 23, 2026"
 const formatDate = (value: string) => {
   const date = new Date(value);
 
-  if (Number.isNaN(date.getTime())) return "—";
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
 
   return date.toLocaleDateString("en-US", {
     month: "short",
@@ -75,7 +73,11 @@ const formatDate = (value: string) => {
   });
 };
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({
+  status,
+}: {
+  status: string;
+}) {
   const { label, icon, className } = getStatus(status);
 
   return (
@@ -84,8 +86,13 @@ function StatusBadge({ status }: { status: string }) {
     >
       <Icon
         name={icon}
-        className={`h-3.5 w-3.5 ${icon === "loader" ? "animate-spin motion-reduce:animate-none" : ""}`}
+        className={`h-3.5 w-3.5 ${
+          icon === "loader"
+            ? "animate-spin motion-reduce:animate-none"
+            : ""
+        }`}
       />
+
       {label}
     </span>
   );
@@ -127,7 +134,10 @@ export default function RecentDocuments({
         </div>
 
         <div className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2">
-          <Icon name="search" className="h-4 w-4 text-slate-400" />
+          <Icon
+            name="search"
+            className="h-4 w-4 text-slate-400"
+          />
 
           <input
             type="search"
@@ -198,10 +208,14 @@ export default function RecentDocuments({
                   <button
                     type="button"
                     onClick={() => onReview?.(document)}
-                    aria-label={`Review ${document.title}`}
-                    className="rounded-lg p-2 hover:bg-slate-100"
+                    aria-label={`View ${document.title}`}
+                    title="View document"
+                    className="rounded-lg p-2 transition hover:bg-slate-100"
                   >
-                    <Icon name="eye" className="h-4 w-4 text-slate-500" />
+                    <Icon
+                      name="eye"
+                      className="h-4 w-4 text-slate-500"
+                    />
                   </button>
                 </td>
               </tr>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import DashboardSidebar from "@/components/Dashboard/DashboardSidebar";
@@ -14,26 +15,58 @@ import {
   getDashboard,
 } from "@/services/dashboardService";
 
+import {
+  getDocuments,
+  getAllReviewDocuments,
+  DocumentItem,
+} from "@/services/documentService";
+
+import { useAuthStore } from "@/store/authStore";
+
 export default function DashboardPage() {
+  const router = useRouter();
+
+  const user = useAuthStore((state) => state.user);
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [dashboard, setDashboard] =
     useState<DashboardData | null>(null);
 
+  const [documents, setDocuments] = useState<DocumentItem[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const isReviewer =
+    user?.role === "manager" ||
+    user?.role === "admin";
+
   useEffect(() => {
+    if (!user) {
+      return;
+    }
+
     const loadDashboard = async () => {
       try {
         setLoading(true);
         setError("");
 
-        const data = await getDashboard();
+        const [dashboardData, documentData] =
+          await Promise.all([
+            getDashboard(),
+            isReviewer
+              ? getAllReviewDocuments()
+              : getDocuments(),
+          ]);
 
-        setDashboard(data);
+        setDashboard(dashboardData);
+        setDocuments(documentData.documents);
       } catch (error) {
-        console.error("Failed to load dashboard:", error);
+        console.error(
+          "Failed to load dashboard:",
+          error,
+        );
 
         setError(
           "Unable to load dashboard data. Please try again.",
@@ -44,7 +77,15 @@ export default function DashboardPage() {
     };
 
     loadDashboard();
-  }, []);
+  }, [user, isReviewer]);
+
+  const recentDocuments = documents.map((document) => ({
+    id: document.id,
+    title: document.title,
+    file_name: document.file_name,
+    status: document.status,
+    created_at: document.created_at,
+  }));
 
   return (
     <ProtectedRoute>
@@ -89,7 +130,12 @@ export default function DashboardPage() {
 
                   <div className="mt-6">
                     <RecentDocuments
-                      documents={dashboard.recent_documents}
+                      documents={recentDocuments}
+                      onReview={(document) => {
+                        router.push(
+                          `/dashboard/documents/${document.id}`,
+                        );
+                      }}
                     />
                   </div>
                 </>

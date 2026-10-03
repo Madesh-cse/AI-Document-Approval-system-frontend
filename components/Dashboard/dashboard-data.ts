@@ -17,12 +17,12 @@ export const NAV = [
   },
   {
     label: "Approved",
-    href: "/approvals/approved",
+    href: "/dashboard/document/approved",
     icon: "check_circle",
   },
   {
     label: "Rejected",
-    href: "/approvals/rejected",
+    href: "/dashboard/document/rejected",
     icon: "x_circle",
   },
   {

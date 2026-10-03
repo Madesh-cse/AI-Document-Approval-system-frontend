@@ -44,14 +44,28 @@ export interface DocumentResponse {
   updated_at: string;
 }
 
-/**
- * Alias used by the Documents UI.
- */
 export type DocumentItem = DocumentResponse;
 
 export interface DocumentListResponse {
   documents: DocumentItem[];
   total: number;
+}
+
+export interface DocumentProcessingResponse {
+  document_id: number;
+
+  status: DocumentStatus;
+
+  category: DocumentCategory;
+  confidence: string;
+  reason: string;
+
+  extraction: Record<string, unknown> | null;
+
+  guardrail_passed: boolean;
+  guardrail_errors: string[];
+
+  indexed: boolean;
 }
 
 export interface DocumentQASource {
@@ -111,6 +125,16 @@ export async function getDocument(
   return response.data;
 }
 
+export async function processDocument(
+  documentId: number,
+): Promise<DocumentProcessingResponse> {
+  const response = await api.post<DocumentProcessingResponse>(
+    `/documents/${documentId}/process`,
+  );
+
+  return response.data;
+}
+
 export async function askDocumentQuestion(
   documentId: number,
   question: string,
@@ -140,6 +164,33 @@ export async function rejectDocument(
 ): Promise<DocumentResponse> {
   const response = await api.post<DocumentResponse>(
     `/documents/${documentId}/reject`,
+  );
+
+  return response.data;
+}
+
+export async function getPendingReviewDocuments(): Promise<DocumentListResponse> {
+  const response = await api.get<DocumentListResponse>(
+    "/documents/review/pending",
+  );
+
+  return response.data;
+}
+
+export async function getAllReviewDocuments(): Promise<DocumentListResponse> {
+  const response = await api.get<DocumentListResponse>(
+    "/documents/review/all",
+  );
+
+  return response.data;
+}
+
+export async function getDocumentFile(documentId: number): Promise<Blob> {
+  const response = await api.get<Blob>(
+    `/documents/${documentId}/file`,
+    {
+      responseType: "blob",
+    },
   );
 
   return response.data;

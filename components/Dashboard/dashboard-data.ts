@@ -11,7 +11,7 @@ export const NAV = [
   },
   {
     label: "Pending Approvals",
-    href: "/approvals/pending",
+    href: "/dashboard/document/pending",
     icon: "clipboard",
     badge: 2,
   },

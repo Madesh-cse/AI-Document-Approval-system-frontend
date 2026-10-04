@@ -185,6 +185,14 @@ export async function getApprovedDocuments(): Promise<DocumentListResponse> {
   return response.data;
 }
 
+export async function getRejectedDocuments(): Promise<DocumentListResponse> {
+  const response = await api.get<DocumentListResponse>(
+    "/documents/review/rejected",
+  );
+
+  return response.data;
+}
+
 export async function getAllReviewDocuments(): Promise<DocumentListResponse> {
   const response = await api.get<DocumentListResponse>(
     "/documents/review/all",

@@ -8,9 +8,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import DashboardHeader from "@/components/Dashboard/DashboardHeader";
 import DashboardSidebar from "@/components/Dashboard/DashboardSidebar";
-import {approveDocument,getDocument,rejectDocument,} from "@/services/documentService";
+import {
+  approveDocument,
+  getDocument,
+  rejectDocument,
+} from "@/services/documentService";
 import { useAuthStore } from "@/store/authStore";
-
 
 function getErrorStatus(error: unknown): number | undefined {
   return isAxiosError(error) ? error.response?.status : undefined;
@@ -134,9 +137,7 @@ const AMOUNT_KEYS = new Set([
 
 const isAmountKey = (key: string) =>
   AMOUNT_KEYS.has(key) || key.endsWith("_amount");
-const isDateKey = (key: string) =>
-  key === "date" || key.endsWith("_date");
-
+const isDateKey = (key: string) => key === "date" || key.endsWith("_date");
 
 /** Type of a single document, taken straight from the service */
 type DocumentDetail = Awaited<ReturnType<typeof getDocument>>;
@@ -162,9 +163,7 @@ function useDocumentReview(
     staleTime: 30_000,
 
     refetchInterval: (query) =>
-      query.state.data?.status === "processing"
-        ? PROCESSING_POLL_MS
-        : false,
+      query.state.data?.status === "processing" ? PROCESSING_POLL_MS : false,
 
     retry: (failureCount, error) => {
       const status = getErrorStatus(error);
@@ -178,10 +177,16 @@ function useDocumentReview(
   });
 
   const decide = useMutation({
-    mutationFn: (decision: ReviewDecision) =>
+    mutationFn: ({
+      decision,
+      reason,
+    }: {
+      decision: ReviewDecision;
+      reason?: string;
+    }) =>
       decision === "approve"
         ? approveDocument(documentId)
-        : rejectDocument(documentId),
+        : rejectDocument(documentId, reason ?? ""),
 
     onSuccess: (updatedDocument) => {
       queryClient.setQueryData(
@@ -201,8 +206,11 @@ function useDocumentReview(
 
   const document = documentQuery.data;
 
-  const isReviewer =userRole === "manager" ||userRole === "admin";
-  const canReview =(userRole === "admin" || userRole === "manager") && document?.status === "pending_review" && document.guardrail_passed === true;
+  const isReviewer = userRole === "manager" || userRole === "admin";
+  const canReview =
+    (userRole === "admin" || userRole === "manager") &&
+    document?.status === "pending_review" &&
+    document.guardrail_passed === true;
   return {
     isValidId,
     document,
@@ -214,7 +222,6 @@ function useDocumentReview(
     decide,
   };
 }
-
 
 const ICONS: Record<string, ReactNode> = {
   arrow_left: (
@@ -443,13 +450,11 @@ const CONFIDENCE_LEVELS: Record<
   low: { level: 1, text: "text-red-700", bar: "bg-red-500" },
 };
 
-function ConfidenceBadge({
-  confidence,
-}: {
-  confidence?: string | null;
-}) {
+function ConfidenceBadge({ confidence }: { confidence?: string | null }) {
   if (!confidence) {
-    return <span className="text-sm font-normal text-slate-500">Not available</span>;
+    return (
+      <span className="text-sm font-normal text-slate-500">Not available</span>
+    );
   }
 
   const key = confidence.toLowerCase();
@@ -473,7 +478,9 @@ function ConfidenceBadge({
         ))}
       </span>
 
-      <span className={`text-sm font-semibold ${style?.text ?? "text-slate-700"}`}>
+      <span
+        className={`text-sm font-semibold ${style?.text ?? "text-slate-700"}`}
+      >
         {label}
       </span>
     </span>
@@ -507,7 +514,6 @@ function ValidationBadge({ passed }: { passed?: boolean | null }) {
   );
 }
 
-
 type Primitive = string | number | boolean;
 const isPrimitive = (value: unknown): value is Primitive =>
   ["string", "number", "boolean"].includes(typeof value);
@@ -527,11 +533,7 @@ type ExtractedValueProps = {
   context: Record<string, unknown>;
 };
 
-function ExtractedValue({
-  fieldKey,
-  value,
-  context,
-}: ExtractedValueProps) {
+function ExtractedValue({ fieldKey, value, context }: ExtractedValueProps) {
   if (value === null || value === undefined || value === "") {
     return EMPTY;
   }
@@ -685,7 +687,7 @@ type ConfirmDialogProps = {
   documentTitle: string;
   isLoading: boolean;
   errorMessage?: string;
-  onConfirm: () => void;
+  onConfirm: (reason?: string) => void;
   onCancel: () => void;
 };
 
@@ -721,14 +723,23 @@ function ConfirmDialog({
   const copy = COPY[decision];
 
   const [visible, setVisible] = useState(false);
+  const [reason, setReason] = useState("");
+
   const cancelRef = useRef<HTMLButtonElement>(null);
   const confirmRef = useRef<HTMLButtonElement>(null);
+  const reasonRef = useRef<HTMLTextAreaElement>(null);
 
-  // Fade in, focus the safe option, lock page scroll
+  const isReject = decision === "reject";
+  const trimmedReason = reason.trim();
+
   useEffect(() => {
     const timer = setTimeout(() => setVisible(true), 20);
 
-    cancelRef.current?.focus();
+    if (isReject) {
+      reasonRef.current?.focus();
+    } else {
+      cancelRef.current?.focus();
+    }
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -737,38 +748,27 @@ function ConfirmDialog({
       clearTimeout(timer);
       document.body.style.overflow = previousOverflow;
     };
-  }, []);
+  }, [isReject]);
 
-  // Escape closes (unless a request is running); Tab stays inside the dialog
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !isLoading) {
         onCancel();
-        return;
-      }
-
-      if (event.key !== "Tab") return;
-
-      const first = cancelRef.current;
-      const last = confirmRef.current;
-
-      if (!first || !last) return;
-
-      const active = document.activeElement;
-
-      if (event.shiftKey && active === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && active === last) {
-        event.preventDefault();
-        first.focus();
       }
     };
 
     window.addEventListener("keydown", onKeyDown);
 
-    return () => window.removeEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
   }, [isLoading, onCancel]);
+
+  const handleConfirm = () => {
+    if (isReject && !trimmedReason) return;
+
+    onConfirm(isReject ? trimmedReason : undefined);
+  };
 
   return (
     <div
@@ -776,16 +776,16 @@ function ConfirmDialog({
         visible ? "opacity-100" : "opacity-0"
       }`}
       onMouseDown={(event) => {
-        // Click on the dark backdrop closes the dialog
-        if (event.target === event.currentTarget && !isLoading) onCancel();
+        if (event.target === event.currentTarget && !isLoading) {
+          onCancel();
+        }
       }}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirm-title"
-        aria-describedby="confirm-description"
-        className={`w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-black/5 transition-all duration-200 ${
+        className={`w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-black/5 transition-all duration-200 ${
           visible
             ? "translate-y-0 scale-100 opacity-100"
             : "translate-y-2 scale-95 opacity-0"
@@ -803,21 +803,52 @@ function ConfirmDialog({
               id="confirm-title"
               className="text-lg font-semibold text-slate-900"
             >
-              {copy.title}
+              {isReject ? "Reject this document?" : "Approve this document?"}
             </h2>
 
-            <p
-              id="confirm-description"
-              className="mt-1.5 text-sm leading-6 text-slate-600"
-            >
-              <span className="wrap-break-words font-medium text-slate-900">
+            <p className="mt-1.5 text-sm leading-6 text-slate-600">
+              <span className="font-medium text-slate-900">
                 &ldquo;{documentTitle}&rdquo;
               </span>{" "}
-              {copy.description} Please confirm you have reviewed the extracted
-              information.
+              {isReject
+                ? "will be marked as rejected."
+                : "will be marked as approved."}
             </p>
           </div>
         </div>
+
+        {isReject && (
+          <div className="mt-6">
+            <label
+              htmlFor="rejection-reason"
+              className="block text-sm font-semibold text-slate-800"
+            >
+              Why are you rejecting this document?
+            </label>
+
+            <textarea
+              ref={reasonRef}
+              id="rejection-reason"
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              disabled={isLoading}
+              maxLength={2000}
+              rows={5}
+              placeholder="Enter the reason for rejecting this document..."
+              className="mt-2 w-full resize-none rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-red-400 focus:ring-4 focus:ring-red-50 disabled:bg-slate-50"
+            />
+
+            <div className="mt-2 flex items-center justify-between">
+              <p className="text-xs text-slate-500">
+                This reason will be visible to the employee.
+              </p>
+
+              <span className="text-xs text-slate-400">
+                {reason.length}/2000
+              </span>
+            </div>
+          </div>
+        )}
 
         {errorMessage && (
           <div
@@ -825,7 +856,8 @@ function ConfirmDialog({
             className="mt-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700"
           >
             <Icon name="alert" className="mt-0.5 h-4 w-4" />
-            {errorMessage}
+
+            <span>{errorMessage}</span>
           </div>
         )}
 
@@ -843,8 +875,8 @@ function ConfirmDialog({
           <button
             ref={confirmRef}
             type="button"
-            onClick={onConfirm}
-            disabled={isLoading}
+            onClick={handleConfirm}
+            disabled={isLoading || (isReject && !trimmedReason)}
             className={`inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${copy.buttonClass} ${focusRing}`}
           >
             {isLoading && (
@@ -853,7 +885,8 @@ function ConfirmDialog({
                 className="h-4 w-4 animate-spin motion-reduce:animate-none"
               />
             )}
-            {isLoading ? copy.busy : copy.action}
+
+            {isLoading ? copy.busy : isReject ? "Reject Document" : "Approve"}
           </button>
         </div>
       </div>
@@ -1122,7 +1155,11 @@ function DocumentReviewContent({
       {(notice || doc.status === "processing" || awaitingValidation) && (
         <div className="space-y-3">
           {notice && (
-            <Banner tone="success" icon="check_circle" onDismiss={onDismissNotice}>
+            <Banner
+              tone="success"
+              icon="check_circle"
+              onDismiss={onDismissNotice}
+            >
               {notice}
             </Banner>
           )}
@@ -1360,20 +1397,34 @@ function DocumentReviewContent({
           )}
 
           {doc.status === "rejected" && (
-            <section className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-6">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-700">
-                <Icon name="x_circle" className="h-5 w-5" />
-              </span>
+            <section className="rounded-2xl border border-red-200 bg-red-50 p-6">
+              <div className="flex items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-700">
+                  <Icon name="x_circle" className="h-5 w-5" />
+                </span>
 
-              <div>
-                <h2 className="font-semibold text-red-800">
-                  Document Rejected
-                </h2>
+                <div className="min-w-0">
+                  <h2 className="font-semibold text-red-800">
+                    Document Rejected
+                  </h2>
 
-                <p className="mt-1 text-sm text-red-700">
-                  This document was rejected during the review process.
-                </p>
+                  <p className="mt-1 text-sm text-red-700">
+                    This document was rejected during the review process.
+                  </p>
+                </div>
               </div>
+
+              {doc.rejection_reason && (
+                <div className="mt-4 rounded-xl border border-red-200 bg-white/70 p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-red-500">
+                    Rejection Reason
+                  </p>
+
+                  <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-red-800">
+                    {doc.rejection_reason}
+                  </p>
+                </div>
+              )}
             </section>
           )}
 
@@ -1484,8 +1535,9 @@ export default function DocumentReviewPage() {
     refetch,
     decide,
   } = useDocumentReview(documentId, user?.role);
-  const [pendingDecision, setPendingDecision] =
-    useState<ReviewDecision | null>(null);
+  const [pendingDecision, setPendingDecision] = useState<ReviewDecision | null>(
+    null,
+  );
   const [notice, setNotice] = useState("");
   const goBack = () => router.back();
   const openDecision = (decision: ReviewDecision) => {
@@ -1498,17 +1550,23 @@ export default function DocumentReviewPage() {
     if (!decide.isPending) setPendingDecision(null);
   };
 
-  const confirmDecision = () => {
+  const confirmDecision = (reason?: string) => {
     if (!pendingDecision) return;
 
     const decision = pendingDecision;
 
-    decide.mutate(decision, {
-      onSuccess: () => {
-        setPendingDecision(null);
-        setNotice(SUCCESS_MESSAGE[decision]);
+    decide.mutate(
+      {
+        decision,
+        reason,
       },
-    });
+      {
+        onSuccess: () => {
+          setPendingDecision(null);
+          setNotice(SUCCESS_MESSAGE[decision]);
+        },
+      },
+    );
   };
 
   let body;

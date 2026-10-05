@@ -32,7 +32,7 @@ export const NAV = [
   },
   {
     label: "Audit Logs",
-    href: "/audit-logs",
+    href: "/dashboard/audit",
     icon: "scroll",
   },
   {

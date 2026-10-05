@@ -37,6 +37,7 @@ export interface DocumentResponse {
   guardrail_errors: string[] | null;
 
   processing_error: string | null;
+  rejection_reason: string | null;
 
   uploaded_by: number;
 
@@ -161,9 +162,13 @@ export async function approveDocument(
 
 export async function rejectDocument(
   documentId: number,
-): Promise<DocumentResponse> {
+  reason: string,
+) {
   const response = await api.post<DocumentResponse>(
     `/documents/${documentId}/reject`,
+    {
+      reason,
+    },
   );
 
   return response.data;

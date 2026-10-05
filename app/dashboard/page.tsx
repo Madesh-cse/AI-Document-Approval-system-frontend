@@ -9,11 +9,9 @@ import DashboardHeader from "@/components/Dashboard/DashboardHeader";
 import DashboardStats from "@/components/Dashboard/DashboardStats";
 import DocumentLifecycle from "@/components/Dashboard/DocumentLifecycle";
 import RecentDocuments from "@/components/Dashboard/RecentDocuments";
+import DashboardCharts from "@/components/Dashboard/DashboardCharts";
 
-import {
-  DashboardData,
-  getDashboard,
-} from "@/services/dashboardService";
+import { DashboardData, getDashboard } from "@/services/dashboardService";
 
 import {
   getDocuments,
@@ -30,17 +28,14 @@ export default function DashboardPage() {
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const [dashboard, setDashboard] =
-    useState<DashboardData | null>(null);
+  const [dashboard, setDashboard] = useState<DashboardData | null>(null);
 
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const isReviewer =
-    user?.role === "manager" ||
-    user?.role === "admin";
+  const isReviewer = user?.role === "manager" || user?.role === "admin";
 
   useEffect(() => {
     if (!user) {
@@ -52,25 +47,17 @@ export default function DashboardPage() {
         setLoading(true);
         setError("");
 
-        const [dashboardData, documentData] =
-          await Promise.all([
-            getDashboard(),
-            isReviewer
-              ? getAllReviewDocuments()
-              : getDocuments(),
-          ]);
+        const [dashboardData, documentData] = await Promise.all([
+          getDashboard(),
+          isReviewer ? getAllReviewDocuments() : getDocuments(),
+        ]);
 
         setDashboard(dashboardData);
         setDocuments(documentData.documents);
       } catch (error) {
-        console.error(
-          "Failed to load dashboard:",
-          error,
-        );
+        console.error("Failed to load dashboard:", error);
 
-        setError(
-          "Unable to load dashboard data. Please try again.",
-        );
+        setError("Unable to load dashboard data. Please try again.");
       } finally {
         setLoading(false);
       }
@@ -83,19 +70,14 @@ export default function DashboardPage() {
     total_documents: documents.length,
 
     pending_review: documents.filter(
-      (document) =>
-        document.status === "pending_review",
+      (document) => document.status === "pending_review",
     ).length,
 
-    approved: documents.filter(
-      (document) =>
-        document.status === "approved",
-    ).length,
+    approved: documents.filter((document) => document.status === "approved")
+      .length,
 
-    rejected: documents.filter(
-      (document) =>
-        document.status === "rejected",
-    ).length,
+    rejected: documents.filter((document) => document.status === "rejected")
+      .length,
   };
 
   const recentDocuments = documents.map((document) => ({
@@ -115,17 +97,13 @@ export default function DashboardPage() {
         />
 
         <div className="lg:pl-62.5">
-          <DashboardHeader
-            onMenuClick={() => setSidebarOpen(true)}
-          />
+          <DashboardHeader onMenuClick={() => setSidebarOpen(true)} />
 
           <main className="p-4 sm:p-6 lg:p-8">
             <div className="mx-auto max-w-[1600px]">
               {loading && (
                 <div className="flex min-h-40 items-center justify-center">
-                  <p className="text-sm text-slate-500">
-                    Loading dashboard...
-                  </p>
+                  <p className="text-sm text-slate-500">Loading dashboard...</p>
                 </div>
               )}
 
@@ -137,23 +115,24 @@ export default function DashboardPage() {
 
               {!loading && !error && dashboard && (
                 <>
-                  <DashboardStats
-                    stats={dashboardStats}
-                  />
+                  <DashboardStats stats={dashboardStats} />
 
                   <div className="mt-6">
-                    <DocumentLifecycle
-                      lifecycle={dashboard.lifecycle}
+                    <DashboardCharts
+                      documents={documents}
+                      isReviewer={isReviewer}
                     />
+                  </div>
+
+                  <div className="mt-6">
+                    <DocumentLifecycle lifecycle={dashboard.lifecycle} />
                   </div>
 
                   <div className="mt-6">
                     <RecentDocuments
                       documents={recentDocuments}
                       onReview={(document) => {
-                        router.push(
-                          `/dashboard/documents/${document.id}`,
-                        );
+                        router.push(`/dashboard/documents/${document.id}`);
                       }}
                     />
                   </div>

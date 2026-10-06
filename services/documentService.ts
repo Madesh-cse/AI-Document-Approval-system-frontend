@@ -38,6 +38,9 @@ export interface DocumentResponse {
 
   processing_error: string | null;
   rejection_reason: string | null;
+  approval_deadline: string | null;
+  calendar_event_id: string | null;
+  calendar_event_created: boolean;
 
   uploaded_by: number;
 
@@ -163,7 +166,7 @@ export async function approveDocument(
 export async function rejectDocument(
   documentId: number,
   reason: string,
-) {
+): Promise<DocumentResponse> {
   const response = await api.post<DocumentResponse>(
     `/documents/${documentId}/reject`,
     {

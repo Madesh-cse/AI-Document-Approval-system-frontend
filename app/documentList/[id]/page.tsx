@@ -26,8 +26,14 @@ function getApiErrorMessage(error: unknown, fallback: string): string {
     }
 
     const detail = error.response.data?.detail;
-    if (typeof detail === "string" && detail) return detail;
-    if (Array.isArray(detail) && detail[0]?.msg) return String(detail[0].msg);
+
+    if (typeof detail === "string" && detail) {
+      return detail;
+    }
+
+    if (Array.isArray(detail) && detail[0]?.msg) {
+      return String(detail[0].msg);
+    }
   }
 
   return fallback;
@@ -40,28 +46,28 @@ const titleCase = (value: string) =>
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
 
-/** "purchase_order" -> "Purchase Order" ("—" when empty) */
 function formatCategory(category?: string | null) {
   return category ? titleCase(category) : "—";
 }
 
-/** "pending_review" -> "Pending Review" */
 function formatStatus(status: string) {
   return titleCase(status);
 }
 
-/** "vendor_legal_name" -> "Vendor Legal Name" */
 function formatLabel(key: string) {
-  return key.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+  return key
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 function parseDate(value?: string | null) {
   if (!value) return null;
+
   const date = new Date(value);
+
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-/** "23 Sep 2026, 10:15 am" */
 function formatDateTime(value?: string | null) {
   const date = parseDate(value);
 
@@ -76,7 +82,6 @@ function formatDateTime(value?: string | null) {
   });
 }
 
-/** "23 Sep 2026" (falls back to the raw text if it isn't a valid date) */
 function formatDate(value?: string | null) {
   const date = parseDate(value);
 
@@ -90,15 +95,26 @@ function formatDate(value?: string | null) {
 }
 
 function formatFileSize(size?: number | null) {
-  if (typeof size !== "number" || !Number.isFinite(size)) return "—";
-  if (size < 1024) return `${size} B`;
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  if (typeof size !== "number" || !Number.isFinite(size)) {
+    return "—";
+  }
+
+  if (size < 1024) {
+    return `${size} B`;
+  }
+
+  if (size < 1024 * 1024) {
+    return `${(size / 1024).toFixed(1)} KB`;
+  }
+
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function formatAmount(value: number, currency?: unknown) {
   const currencyCode =
-    typeof currency === "string" && currency.length > 0 ? currency : "INR";
+    typeof currency === "string" && currency.length > 0
+      ? currency
+      : "INR";
 
   try {
     return new Intl.NumberFormat("en-IN", {
@@ -111,7 +127,122 @@ function formatAmount(value: number, currency?: unknown) {
   }
 }
 
-// Extracted-data keys that hold money values
+/* -------------------------------------------------------------------------- */
+/* Deadline helpers                                                           */
+/* -------------------------------------------------------------------------- */
+
+function formatTimeRemaining(milliseconds: number) {
+  if (milliseconds <= 0) {
+    return "Deadline passed";
+  }
+
+  const totalSeconds = Math.floor(milliseconds / 1000);
+
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (days > 0) {
+    return `${days}d ${hours}h ${minutes}m`;
+  }
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  }
+
+  return `${seconds}s`;
+}
+
+function getDeadlineState(deadline?: string | null) {
+  if (!deadline) {
+    return {
+      valid: false,
+      overdue: false,
+      urgent: false,
+      remaining: 0,
+    };
+  }
+
+  const deadlineTime = new Date(deadline).getTime();
+
+  if (Number.isNaN(deadlineTime)) {
+    return {
+      valid: false,
+      overdue: false,
+      urgent: false,
+      remaining: 0,
+    };
+  }
+
+  const remaining = deadlineTime - Date.now();
+
+  return {
+    valid: true,
+    overdue: remaining <= 0,
+    urgent: remaining > 0 && remaining <= 6 * 60 * 60 * 1000,
+    remaining,
+  };
+}
+
+function useDeadlineCountdown(deadline?: string | null) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!deadline) return;
+
+    const timer = window.setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [deadline]);
+
+  if (!deadline) {
+    return {
+      valid: false,
+      overdue: false,
+      urgent: false,
+      remaining: 0,
+      label: "No deadline",
+    };
+  }
+
+  const deadlineTime = new Date(deadline).getTime();
+
+  if (Number.isNaN(deadlineTime)) {
+    return {
+      valid: false,
+      overdue: false,
+      urgent: false,
+      remaining: 0,
+      label: "No deadline",
+    };
+  }
+
+  const remaining = deadlineTime - now;
+
+  return {
+    valid: true,
+    overdue: remaining <= 0,
+    urgent:
+      remaining > 0 &&
+      remaining <= 6 * 60 * 60 * 1000,
+    remaining,
+    label: formatTimeRemaining(remaining),
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Amount fields                                                              */
+/* -------------------------------------------------------------------------- */
+
 const AMOUNT_KEYS = new Set([
   "subtotal",
   "tax_amount",
@@ -137,25 +268,38 @@ const AMOUNT_KEYS = new Set([
 
 const isAmountKey = (key: string) =>
   AMOUNT_KEYS.has(key) || key.endsWith("_amount");
-const isDateKey = (key: string) => key === "date" || key.endsWith("_date");
 
-/** Type of a single document, taken straight from the service */
+const isDateKey = (key: string) =>
+  key === "date" || key.endsWith("_date");
+
+/* -------------------------------------------------------------------------- */
+/* Types                                                                      */
+/* -------------------------------------------------------------------------- */
+
 type DocumentDetail = Awaited<ReturnType<typeof getDocument>>;
+
 type ReviewDecision = "approve" | "reject";
-/** One place for every query key, so invalidation never drifts */
+
 const documentKeys = {
   list: ["documents"] as const,
   detail: (id: number) => ["document", id] as const,
 };
 
 const PROCESSING_POLL_MS = 5000;
-// Custom hook for managing document review logic
+
+/* -------------------------------------------------------------------------- */
+/* Document hook                                                              */
+/* -------------------------------------------------------------------------- */
+
 function useDocumentReview(
   documentId: number,
   userRole: "admin" | "manager" | "employee" | undefined,
 ) {
   const queryClient = useQueryClient();
-  const isValidId = Number.isInteger(documentId) && documentId > 0;
+
+  const isValidId =
+    Number.isInteger(documentId) && documentId > 0;
+
   const documentQuery = useQuery({
     queryKey: documentKeys.detail(documentId),
     queryFn: () => getDocument(documentId),
@@ -163,7 +307,9 @@ function useDocumentReview(
     staleTime: 30_000,
 
     refetchInterval: (query) =>
-      query.state.data?.status === "processing" ? PROCESSING_POLL_MS : false,
+      query.state.data?.status === "processing"
+        ? PROCESSING_POLL_MS
+        : false,
 
     retry: (failureCount, error) => {
       const status = getErrorStatus(error);
@@ -206,11 +352,11 @@ function useDocumentReview(
 
   const document = documentQuery.data;
 
-  const isReviewer = userRole === "manager" || userRole === "admin";
   const canReview =
     (userRole === "admin" || userRole === "manager") &&
     document?.status === "pending_review" &&
     document.guardrail_passed === true;
+
   return {
     isValidId,
     document,
@@ -223,6 +369,10 @@ function useDocumentReview(
   };
 }
 
+/* -------------------------------------------------------------------------- */
+/* Icons                                                                      */
+/* -------------------------------------------------------------------------- */
+
 const ICONS: Record<string, ReactNode> = {
   arrow_left: (
     <>
@@ -230,6 +380,7 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M19 12H5" />
     </>
   ),
+
   file: (
     <>
       <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
@@ -237,6 +388,7 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M10 9H8M16 13H8M16 17H8" />
     </>
   ),
+
   list: (
     <>
       <path d="m3 17 2 2 4-4" />
@@ -244,60 +396,71 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M13 6h8M13 12h8M13 18h8" />
     </>
   ),
+
   sparkles: (
     <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" />
   ),
+
   shield_check: (
     <>
       <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
       <path d="m9 12 2 2 4-4" />
     </>
   ),
+
   shield_alert: (
     <>
       <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
       <path d="M12 8v4M12 16h.01" />
     </>
   ),
+
   clock: (
     <>
       <circle cx="12" cy="12" r="10" />
       <path d="M12 6v6l4 2" />
     </>
   ),
+
   check_circle: (
     <>
       <circle cx="12" cy="12" r="10" />
       <path d="m9 12 2 2 4-4" />
     </>
   ),
+
   x_circle: (
     <>
       <circle cx="12" cy="12" r="10" />
       <path d="m15 9-6 6M9 9l6 6" />
     </>
   ),
+
   loader: <path d="M21 12a9 9 0 1 1-6.219-8.56" />,
+
   info: (
     <>
       <circle cx="12" cy="12" r="10" />
       <path d="M12 16v-4M12 8h.01" />
     </>
   ),
+
   alert: (
     <>
       <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" />
       <path d="M12 9v4M12 17h.01" />
     </>
   ),
+
   refresh: (
     <>
       <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
       <path d="M21 3v5h-5" />
-      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74 2.74L3 16" />
       <path d="M8 16H3v5" />
     </>
   ),
+
   database: (
     <>
       <ellipse cx="12" cy="5" rx="9" ry="3" />
@@ -305,6 +468,15 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M3 12a9 3 0 0 0 18 0" />
     </>
   ),
+
+  calendar: (
+    <>
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M16 2v4M8 2v4M3 10h18" />
+      <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" />
+    </>
+  ),
+
   close: <path d="M18 6 6 18M6 6l12 12" />,
 };
 
@@ -331,7 +503,10 @@ function Icon({
   );
 }
 
-// ── Layout pieces ─────────────────────────────────────────────────────────
+/* -------------------------------------------------------------------------- */
+/* Layout                                                                     */
+/* -------------------------------------------------------------------------- */
+
 const focusRing =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900";
 
@@ -368,7 +543,9 @@ function SectionCard({
             </h2>
 
             {description && (
-              <p className="mt-0.5 text-sm text-slate-500">{description}</p>
+              <p className="mt-0.5 text-sm text-slate-500">
+                {description}
+              </p>
             )}
           </div>
         </div>
@@ -381,7 +558,6 @@ function SectionCard({
   );
 }
 
-/** Label + value pair. Use inside a <dl>. */
 function Field({
   label,
   children,
@@ -404,24 +580,34 @@ function Field({
   );
 }
 
-// ── Badges ────────────────────────────────────────────────────────────────
-const STATUS_STYLES: Record<string, { badge: string; dot: string }> = {
+/* -------------------------------------------------------------------------- */
+/* Badges                                                                     */
+/* -------------------------------------------------------------------------- */
+
+const STATUS_STYLES: Record<
+  string,
+  { badge: string; dot: string }
+> = {
   draft: {
     badge: "bg-slate-50 text-slate-700 ring-slate-200",
     dot: "bg-slate-400",
   },
+
   processing: {
     badge: "bg-blue-50 text-blue-700 ring-blue-200",
     dot: "bg-blue-500 animate-pulse motion-reduce:animate-none",
   },
+
   pending_review: {
     badge: "bg-amber-50 text-amber-700 ring-amber-200",
     dot: "bg-amber-500",
   },
+
   approved: {
     badge: "bg-emerald-50 text-emerald-700 ring-emerald-200",
     dot: "bg-emerald-500",
   },
+
   rejected: {
     badge: "bg-red-50 text-red-700 ring-red-200",
     dot: "bg-red-500",
@@ -429,13 +615,17 @@ const STATUS_STYLES: Record<string, { badge: string; dot: string }> = {
 };
 
 function StatusBadge({ status }: { status: string }) {
-  const style = STATUS_STYLES[status] ?? STATUS_STYLES.draft;
+  const style =
+    STATUS_STYLES[status] ?? STATUS_STYLES.draft;
 
   return (
     <span
       className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${style.badge}`}
     >
-      <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
+      <span
+        className={`h-1.5 w-1.5 rounded-full ${style.dot}`}
+      />
+
       {formatStatus(status)}
     </span>
   );
@@ -445,21 +635,44 @@ const CONFIDENCE_LEVELS: Record<
   string,
   { level: number; text: string; bar: string }
 > = {
-  high: { level: 3, text: "text-emerald-700", bar: "bg-emerald-500" },
-  medium: { level: 2, text: "text-amber-700", bar: "bg-amber-500" },
-  low: { level: 1, text: "text-red-700", bar: "bg-red-500" },
+  high: {
+    level: 3,
+    text: "text-emerald-700",
+    bar: "bg-emerald-500",
+  },
+
+  medium: {
+    level: 2,
+    text: "text-amber-700",
+    bar: "bg-amber-500",
+  },
+
+  low: {
+    level: 1,
+    text: "text-red-700",
+    bar: "bg-red-500",
+  },
 };
 
-function ConfidenceBadge({ confidence }: { confidence?: string | null }) {
+function ConfidenceBadge({
+  confidence,
+}: {
+  confidence?: string | null;
+}) {
   if (!confidence) {
     return (
-      <span className="text-sm font-normal text-slate-500">Not available</span>
+      <span className="text-sm font-normal text-slate-500">
+        Not available
+      </span>
     );
   }
 
   const key = confidence.toLowerCase();
   const style = CONFIDENCE_LEVELS[key];
-  const label = confidence.charAt(0).toUpperCase() + confidence.slice(1);
+
+  const label =
+    confidence.charAt(0).toUpperCase() +
+    confidence.slice(1);
 
   return (
     <span className="inline-flex items-center gap-2">
@@ -472,14 +685,18 @@ function ConfidenceBadge({ confidence }: { confidence?: string | null }) {
           <span
             key={segment}
             className={`h-1.5 w-4 rounded-full ${
-              style && segment <= style.level ? style.bar : "bg-slate-200"
+              style && segment <= style.level
+                ? style.bar
+                : "bg-slate-200"
             }`}
           />
         ))}
       </span>
 
       <span
-        className={`text-sm font-semibold ${style?.text ?? "text-slate-700"}`}
+        className={`text-sm font-semibold ${
+          style?.text ?? "text-slate-700"
+        }`}
       >
         {label}
       </span>
@@ -487,11 +704,18 @@ function ConfidenceBadge({ confidence }: { confidence?: string | null }) {
   );
 }
 
-function ValidationBadge({ passed }: { passed?: boolean | null }) {
+function ValidationBadge({
+  passed,
+}: {
+  passed?: boolean | null;
+}) {
   if (passed === true) {
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200">
-        <Icon name="shield_check" className="h-3.5 w-3.5" />
+        <Icon
+          name="shield_check"
+          className="h-3.5 w-3.5"
+        />
         Passed
       </span>
     );
@@ -500,7 +724,10 @@ function ValidationBadge({ passed }: { passed?: boolean | null }) {
   if (passed === false) {
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 ring-1 ring-inset ring-red-200">
-        <Icon name="shield_alert" className="h-3.5 w-3.5" />
+        <Icon
+          name="shield_alert"
+          className="h-3.5 w-3.5"
+        />
         Failed
       </span>
     );
@@ -514,27 +741,52 @@ function ValidationBadge({ passed }: { passed?: boolean | null }) {
   );
 }
 
+/* -------------------------------------------------------------------------- */
+/* Extracted values                                                           */
+/* -------------------------------------------------------------------------- */
+
 type Primitive = string | number | boolean;
-const isPrimitive = (value: unknown): value is Primitive =>
-  ["string", "number", "boolean"].includes(typeof value);
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
 
-/** Lists and objects are shown full-width; simple values sit in a 2-column grid */
+const isPrimitive = (
+  value: unknown,
+): value is Primitive =>
+  ["string", "number", "boolean"].includes(
+    typeof value,
+  );
+
+const isRecord = (
+  value: unknown,
+): value is Record<string, unknown> =>
+  typeof value === "object" &&
+  value !== null &&
+  !Array.isArray(value);
+
 const isComplexValue = (value: unknown) =>
-  (Array.isArray(value) && value.length > 0) || isRecord(value);
+  (Array.isArray(value) && value.length > 0) ||
+  isRecord(value);
 
-const EMPTY = <span className="font-normal text-slate-400">—</span>;
+const EMPTY = (
+  <span className="font-normal text-slate-400">
+    —
+  </span>
+);
 
 type ExtractedValueProps = {
   fieldKey: string;
   value: unknown;
-  /** The whole extracted object (used to read e.g. the currency) */
   context: Record<string, unknown>;
 };
 
-function ExtractedValue({ fieldKey, value, context }: ExtractedValueProps) {
-  if (value === null || value === undefined || value === "") {
+function ExtractedValue({
+  fieldKey,
+  value,
+  context,
+}: ExtractedValueProps) {
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
     return EMPTY;
   }
 
@@ -544,7 +796,9 @@ function ExtractedValue({ fieldKey, value, context }: ExtractedValueProps) {
         {formatAmount(value, context.currency)}
       </span>
     ) : (
-      <span className="tabular-nums">{String(value)}</span>
+      <span className="tabular-nums">
+        {String(value)}
+      </span>
     );
   }
 
@@ -563,13 +817,20 @@ function ExtractedValue({ fieldKey, value, context }: ExtractedValueProps) {
   }
 
   if (typeof value === "string") {
-    return <span>{isDateKey(fieldKey) ? formatDate(value) : value}</span>;
+    return (
+      <span>
+        {isDateKey(fieldKey)
+          ? formatDate(value)
+          : value}
+      </span>
+    );
   }
 
   if (Array.isArray(value)) {
-    if (value.length === 0) return EMPTY;
+    if (value.length === 0) {
+      return EMPTY;
+    }
 
-    // ["a", "b"] -> chips
     if (value.every(isPrimitive)) {
       return (
         <ul className="flex flex-wrap gap-2">
@@ -585,9 +846,13 @@ function ExtractedValue({ fieldKey, value, context }: ExtractedValueProps) {
       );
     }
 
-    // [{...}, {...}] -> table (e.g. invoice line items)
     if (value.every(isRecord)) {
-      return <ObjectTable rows={value} context={context} />;
+      return (
+        <ObjectTable
+          rows={value}
+          context={context}
+        />
+      );
     }
 
     return (
@@ -607,7 +872,9 @@ function ExtractedValue({ fieldKey, value, context }: ExtractedValueProps) {
   if (isRecord(value)) {
     const entries = Object.entries(value);
 
-    if (entries.length === 0) return EMPTY;
+    if (entries.length === 0) {
+      return EMPTY;
+    }
 
     return (
       <dl className="grid gap-x-6 gap-y-3 rounded-lg bg-slate-50 p-4 sm:grid-cols-2">
@@ -618,7 +885,11 @@ function ExtractedValue({ fieldKey, value, context }: ExtractedValueProps) {
             </dt>
 
             <dd className="mt-0.5 text-sm font-medium text-slate-800">
-              <ExtractedValue fieldKey={key} value={nested} context={context} />
+              <ExtractedValue
+                fieldKey={key}
+                value={nested}
+                context={context}
+              />
             </dd>
           </div>
         ))}
@@ -636,8 +907,13 @@ function ObjectTable({
   rows: Record<string, unknown>[];
   context: Record<string, unknown>;
 }) {
-  // Union of all keys, in first-seen order
-  const columns = Array.from(new Set(rows.flatMap((row) => Object.keys(row))));
+  const columns = Array.from(
+    new Set(
+      rows.flatMap((row) =>
+        Object.keys(row),
+      ),
+    ),
+  );
 
   return (
     <div className="overflow-x-auto rounded-lg border border-slate-200">
@@ -681,7 +957,189 @@ function ObjectTable({
   );
 }
 
-// Confirm dialog
+/* -------------------------------------------------------------------------- */
+/* Approval deadline card                                                     */
+/* -------------------------------------------------------------------------- */
+
+function ApprovalDeadlineCard({
+  doc,
+}: {
+  doc: DocumentDetail;
+}) {
+  const countdown = useDeadlineCountdown(
+    doc.approval_deadline,
+  );
+
+  if (
+    doc.status !== "pending_review" ||
+    !doc.approval_deadline
+  ) {
+    return null;
+  }
+
+  const deadlineState = getDeadlineState(
+    doc.approval_deadline,
+  );
+
+  const cardClass = countdown.overdue
+    ? "border-red-200 bg-red-50"
+    : countdown.urgent
+      ? "border-orange-200 bg-orange-50"
+      : "border-amber-200 bg-amber-50";
+
+  const iconClass = countdown.overdue
+    ? "bg-red-100 text-red-700"
+    : countdown.urgent
+      ? "bg-orange-100 text-orange-700"
+      : "bg-amber-100 text-amber-700";
+
+  const titleClass = countdown.overdue
+    ? "text-red-900"
+    : countdown.urgent
+      ? "text-orange-900"
+      : "text-amber-900";
+
+  const textClass = countdown.overdue
+    ? "text-red-700"
+    : countdown.urgent
+      ? "text-orange-700"
+      : "text-amber-700";
+
+  return (
+    <section
+      className={`rounded-2xl border p-6 ${cardClass}`}
+    >
+      <div className="flex items-start gap-4">
+        <span
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${iconClass}`}
+        >
+          <Icon
+            name={
+              countdown.overdue
+                ? "alert"
+                : "calendar"
+            }
+            className="h-5 w-5"
+          />
+        </span>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2
+                className={`text-[15px] font-semibold ${titleClass}`}
+              >
+                {countdown.overdue
+                  ? "Approval Deadline Passed"
+                  : "Approval Deadline"}
+              </h2>
+
+              <p
+                className={`mt-1 text-sm ${textClass}`}
+              >
+                {countdown.overdue
+                  ? "This document is still waiting for approval."
+                  : "Manager approval is required before the deadline."}
+              </p>
+            </div>
+
+            <div
+              className={`shrink-0 rounded-xl bg-white/80 px-4 py-2 text-center shadow-sm ring-1 ring-black/5 ${
+                countdown.overdue
+                  ? "text-red-700"
+                  : countdown.urgent
+                    ? "text-orange-700"
+                    : "text-amber-700"
+              }`}
+            >
+              <p className="text-[10px] font-semibold uppercase tracking-wider opacity-70">
+                {countdown.overdue
+                  ? "Status"
+                  : "Time Remaining"}
+              </p>
+
+              <p className="mt-0.5 text-lg font-bold tabular-nums">
+                {countdown.overdue
+                  ? "Overdue"
+                  : countdown.label}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <div className="rounded-xl bg-white/70 p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                Deadline
+              </p>
+
+              <p className="mt-1 text-sm font-semibold text-slate-800">
+                {formatDateTime(
+                  doc.approval_deadline,
+                )}
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-white/70 p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                Calendar Reminder
+              </p>
+
+              <div className="mt-1 flex items-center gap-2">
+                {doc.calendar_event_created ? (
+                  <>
+                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
+
+                    <span className="text-sm font-semibold text-emerald-700">
+                      Scheduled
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="h-2 w-2 rounded-full bg-slate-400" />
+
+                    <span className="text-sm font-semibold text-slate-600">
+                      Not scheduled
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {doc.calendar_event_created &&
+            doc.calendar_event_id && (
+              <p
+                className={`mt-4 text-xs ${textClass}`}
+              >
+                Calendar event created successfully for
+                this approval deadline.
+              </p>
+            )}
+
+          {!doc.calendar_event_created && (
+            <p
+              className={`mt-4 text-xs ${textClass}`}
+            >
+              The approval deadline is available, but
+              the calendar reminder was not created.
+            </p>
+          )}
+
+          {!deadlineState.valid && (
+            <p className="mt-3 text-xs text-red-700">
+              The stored approval deadline is invalid.
+            </p>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Confirm dialog                                                             */
+/* -------------------------------------------------------------------------- */
+
 type ConfirmDialogProps = {
   decision: ReviewDecision;
   documentTitle: string;
@@ -698,17 +1156,22 @@ const COPY = {
     action: "Approve",
     busy: "Approving...",
     icon: "check_circle",
-    iconClass: "bg-emerald-50 text-emerald-600 ring-emerald-100",
-    buttonClass: "bg-emerald-600 hover:bg-emerald-700",
+    iconClass:
+      "bg-emerald-50 text-emerald-600 ring-emerald-100",
+    buttonClass:
+      "bg-emerald-600 hover:bg-emerald-700",
   },
+
   reject: {
     title: "Reject this document?",
     description: "will be marked as rejected.",
     action: "Reject",
     busy: "Rejecting...",
     icon: "x_circle",
-    iconClass: "bg-red-50 text-red-600 ring-red-100",
-    buttonClass: "bg-red-600 hover:bg-red-700",
+    iconClass:
+      "bg-red-50 text-red-600 ring-red-100",
+    buttonClass:
+      "bg-red-600 hover:bg-red-700",
   },
 } as const;
 
@@ -725,15 +1188,20 @@ function ConfirmDialog({
   const [visible, setVisible] = useState(false);
   const [reason, setReason] = useState("");
 
-  const cancelRef = useRef<HTMLButtonElement>(null);
-  const confirmRef = useRef<HTMLButtonElement>(null);
-  const reasonRef = useRef<HTMLTextAreaElement>(null);
+  const cancelRef =
+    useRef<HTMLButtonElement>(null);
+
+  const reasonRef =
+    useRef<HTMLTextAreaElement>(null);
 
   const isReject = decision === "reject";
   const trimmedReason = reason.trim();
 
   useEffect(() => {
-    const timer = setTimeout(() => setVisible(true), 20);
+    const timer = setTimeout(
+      () => setVisible(true),
+      20,
+    );
 
     if (isReject) {
       reasonRef.current?.focus();
@@ -741,42 +1209,65 @@ function ConfirmDialog({
       cancelRef.current?.focus();
     }
 
-    const previousOverflow = document.body.style.overflow;
+    const previousOverflow =
+      document.body.style.overflow;
+
     document.body.style.overflow = "hidden";
 
     return () => {
       clearTimeout(timer);
-      document.body.style.overflow = previousOverflow;
+      document.body.style.overflow =
+        previousOverflow;
     };
   }, [isReject]);
 
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !isLoading) {
+    const onKeyDown = (
+      event: KeyboardEvent,
+    ) => {
+      if (
+        event.key === "Escape" &&
+        !isLoading
+      ) {
         onCancel();
       }
     };
 
-    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener(
+      "keydown",
+      onKeyDown,
+    );
 
     return () => {
-      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener(
+        "keydown",
+        onKeyDown,
+      );
     };
   }, [isLoading, onCancel]);
 
   const handleConfirm = () => {
-    if (isReject && !trimmedReason) return;
+    if (isReject && !trimmedReason) {
+      return;
+    }
 
-    onConfirm(isReject ? trimmedReason : undefined);
+    onConfirm(
+      isReject ? trimmedReason : undefined,
+    );
   };
 
   return (
     <div
       className={`fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 backdrop-blur-sm transition-opacity duration-200 ${
-        visible ? "opacity-100" : "opacity-0"
+        visible
+          ? "opacity-100"
+          : "opacity-0"
       }`}
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !isLoading) {
+        if (
+          event.target === event.currentTarget &&
+          !isLoading
+        ) {
           onCancel();
         }
       }}
@@ -795,7 +1286,10 @@ function ConfirmDialog({
           <span
             className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ring-4 ${copy.iconClass}`}
           >
-            <Icon name={copy.icon} className="h-5 w-5" />
+            <Icon
+              name={copy.icon}
+              className="h-5 w-5"
+            />
           </span>
 
           <div className="min-w-0">
@@ -803,16 +1297,14 @@ function ConfirmDialog({
               id="confirm-title"
               className="text-lg font-semibold text-slate-900"
             >
-              {isReject ? "Reject this document?" : "Approve this document?"}
+              {copy.title}
             </h2>
 
             <p className="mt-1.5 text-sm leading-6 text-slate-600">
               <span className="font-medium text-slate-900">
                 &ldquo;{documentTitle}&rdquo;
               </span>{" "}
-              {isReject
-                ? "will be marked as rejected."
-                : "will be marked as approved."}
+              {copy.description}
             </p>
           </div>
         </div>
@@ -830,7 +1322,9 @@ function ConfirmDialog({
               ref={reasonRef}
               id="rejection-reason"
               value={reason}
-              onChange={(event) => setReason(event.target.value)}
+              onChange={(event) =>
+                setReason(event.target.value)
+              }
               disabled={isLoading}
               maxLength={2000}
               rows={5}
@@ -840,7 +1334,8 @@ function ConfirmDialog({
 
             <div className="mt-2 flex items-center justify-between">
               <p className="text-xs text-slate-500">
-                This reason will be visible to the employee.
+                This reason will be visible to the
+                employee.
               </p>
 
               <span className="text-xs text-slate-400">
@@ -855,7 +1350,10 @@ function ConfirmDialog({
             role="alert"
             className="mt-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700"
           >
-            <Icon name="alert" className="mt-0.5 h-4 w-4" />
+            <Icon
+              name="alert"
+              className="mt-0.5 h-4 w-4"
+            />
 
             <span>{errorMessage}</span>
           </div>
@@ -873,10 +1371,12 @@ function ConfirmDialog({
           </button>
 
           <button
-            ref={confirmRef}
             type="button"
             onClick={handleConfirm}
-            disabled={isLoading || (isReject && !trimmedReason)}
+            disabled={
+              isLoading ||
+              (isReject && !trimmedReason)
+            }
             className={`inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${copy.buttonClass} ${focusRing}`}
           >
             {isLoading && (
@@ -886,15 +1386,27 @@ function ConfirmDialog({
               />
             )}
 
-            {isLoading ? copy.busy : isReject ? "Reject Document" : "Approve"}
+            {isLoading
+              ? copy.busy
+              : isReject
+                ? "Reject Document"
+                : "Approve"}
           </button>
         </div>
       </div>
     </div>
   );
 }
-// Loading and error states
-function Bone({ className = "" }: { className?: string }) {
+
+/* -------------------------------------------------------------------------- */
+/* Loading                                                                     */
+/* -------------------------------------------------------------------------- */
+
+function Bone({
+  className = "",
+}: {
+  className?: string;
+}) {
   return (
     <div
       className={`animate-pulse rounded-lg bg-slate-200/70 motion-reduce:animate-none ${className}`}
@@ -902,24 +1414,29 @@ function Bone({ className = "" }: { className?: string }) {
   );
 }
 
-function SkeletonCard({ rows = 4 }: { rows?: number }) {
+function SkeletonCard({
+  rows = 4,
+}: {
+  rows?: number;
+}) {
   return (
     <div className="rounded-2xl border border-slate-200/80 bg-white p-6">
       <Bone className="h-4 w-40" />
 
       <div className="mt-6 grid gap-5 sm:grid-cols-2">
-        {Array.from({ length: rows }).map((_, index) => (
-          <div key={index}>
-            <Bone className="h-3 w-24" />
-            <Bone className="mt-2 h-4 w-3/4" />
-          </div>
-        ))}
+        {Array.from({ length: rows }).map(
+          (_, index) => (
+            <div key={index}>
+              <Bone className="h-3 w-24" />
+              <Bone className="mt-2 h-4 w-3/4" />
+            </div>
+          ),
+        )}
       </div>
     </div>
   );
 }
 
-/** Placeholder with the same shape as the real page, shown while loading */
 function DocumentReviewSkeleton() {
   return (
     <div
@@ -968,8 +1485,15 @@ function DocumentReviewError({
       <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-600 ring-4 ring-red-50/60">
         <Icon name="alert" className="h-6 w-6" />
       </span>
-      <h2 className="mt-4 text-lg font-semibold text-slate-900">{title}</h2>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{message}</p>
+
+      <h2 className="mt-4 text-lg font-semibold text-slate-900">
+        {title}
+      </h2>
+
+      <p className="mt-2 text-sm leading-6 text-slate-600">
+        {message}
+      </p>
+
       <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
         <button
           type="button"
@@ -995,22 +1519,21 @@ function DocumentReviewError({
   );
 }
 
-// Page content
+/* -------------------------------------------------------------------------- */
+/* Banner                                                                     */
+/* -------------------------------------------------------------------------- */
 
-type DocumentReviewContentProps = {
-  doc: DocumentDetail;
-  canReview: boolean;
-  busy: boolean;
-  notice: string;
-  onDismissNotice: () => void;
-  onDecision: (decision: ReviewDecision) => void;
-  onBack: () => void;
-};
+type BannerTone =
+  | "info"
+  | "success"
+  | "warning";
 
 const BANNER_TONES = {
   info: "border-blue-200 bg-blue-50 text-blue-800",
-  success: "border-emerald-200 bg-emerald-50 text-emerald-800",
-  warning: "border-amber-200 bg-amber-50 text-amber-800",
+  success:
+    "border-emerald-200 bg-emerald-50 text-emerald-800",
+  warning:
+    "border-amber-200 bg-amber-50 text-amber-800",
 } as const;
 
 function Banner({
@@ -1019,7 +1542,7 @@ function Banner({
   children,
   onDismiss,
 }: {
-  tone: keyof typeof BANNER_TONES;
+  tone: BannerTone;
   icon: string;
   children: ReactNode;
   onDismiss?: () => void;
@@ -1032,11 +1555,15 @@ function Banner({
       <Icon
         name={icon}
         className={`mt-0.5 h-4 w-4 ${
-          icon === "loader" ? "animate-spin motion-reduce:animate-none" : ""
+          icon === "loader"
+            ? "animate-spin motion-reduce:animate-none"
+            : ""
         }`}
       />
 
-      <div className="flex-1">{children}</div>
+      <div className="flex-1">
+        {children}
+      </div>
 
       {onDismiss && (
         <button
@@ -1045,12 +1572,19 @@ function Banner({
           aria-label="Dismiss message"
           className={`rounded p-0.5 opacity-70 transition hover:opacity-100 ${focusRing}`}
         >
-          <Icon name="close" className="h-4 w-4" />
+          <Icon
+            name="close"
+            className="h-4 w-4"
+          />
         </button>
       )}
     </div>
   );
 }
+
+/* -------------------------------------------------------------------------- */
+/* Decision buttons                                                           */
+/* -------------------------------------------------------------------------- */
 
 function DecisionButtons({
   busy,
@@ -1058,11 +1592,17 @@ function DecisionButtons({
   stacked = false,
 }: {
   busy: boolean;
-  onDecision: (decision: ReviewDecision) => void;
+  onDecision: (
+    decision: ReviewDecision,
+  ) => void;
   stacked?: boolean;
 }) {
   return (
-    <div className={`flex gap-3 ${stacked ? "flex-col" : ""}`}>
+    <div
+      className={`flex gap-3 ${
+        stacked ? "flex-col" : ""
+      }`}
+    >
       <button
         type="button"
         disabled={busy}
@@ -1087,10 +1627,28 @@ function DecisionButtons({
 }
 
 const Dot = () => (
-  <span aria-hidden="true" className="h-1 w-1 rounded-full bg-slate-300" />
+  <span
+    aria-hidden="true"
+    className="h-1 w-1 rounded-full bg-slate-300"
+  />
 );
 
-// ── Page content ──────────────────────────────────────────────────────────
+/* -------------------------------------------------------------------------- */
+/* Document content                                                           */
+/* -------------------------------------------------------------------------- */
+
+type DocumentReviewContentProps = {
+  doc: DocumentDetail;
+  canReview: boolean;
+  busy: boolean;
+  notice: string;
+  onDismissNotice: () => void;
+  onDecision: (
+    decision: ReviewDecision,
+  ) => void;
+  onBack: () => void;
+};
+
 function DocumentReviewContent({
   doc,
   canReview,
@@ -1100,18 +1658,37 @@ function DocumentReviewContent({
   onDecision,
   onBack,
 }: DocumentReviewContentProps) {
-  const extracted = doc.extracted_data as Record<string, unknown> | null;
-  const entries = extracted ? Object.entries(extracted) : [];
+  const extracted =
+    doc.extracted_data as Record<
+      string,
+      unknown
+    > | null;
 
-  const simpleEntries = entries.filter(([, value]) => !isComplexValue(value));
-  const complexEntries = entries.filter(([, value]) => isComplexValue(value));
+  const entries = extracted
+    ? Object.entries(extracted)
+    : [];
+
+  const simpleEntries = entries.filter(
+    ([, value]) =>
+      !isComplexValue(value),
+  );
+
+  const complexEntries = entries.filter(
+    ([, value]) =>
+      isComplexValue(value),
+  );
 
   const awaitingValidation =
-    doc.status === "pending_review" && doc.guardrail_passed !== true;
+    doc.status === "pending_review" &&
+    doc.guardrail_passed !== true;
+
+  const countdown = useDeadlineCountdown(
+    doc.approval_deadline,
+  );
 
   return (
     <div className="space-y-6">
-      {/* ── Header ── */}
+      {/* Header */}
       <header className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
         <button
           type="button"
@@ -1129,30 +1706,61 @@ function DocumentReviewContent({
                 {doc.title}
               </h1>
 
-              <StatusBadge status={doc.status} />
+              <StatusBadge
+                status={doc.status}
+              />
             </div>
 
             <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-500">
-              <span>Document #{doc.id}</span>
+              <span>
+                Document #{doc.id}
+              </span>
+
               <Dot />
-              <span>{doc.file_type}</span>
+
+              <span>
+                {doc.file_type}
+              </span>
+
               <Dot />
-              <span>{formatFileSize(doc.file_size)}</span>
+
+              <span>
+                {formatFileSize(
+                  doc.file_size,
+                )}
+              </span>
+
               <Dot />
-              <span>Uploaded {formatDateTime(doc.created_at)}</span>
+
+              <span>
+                Uploaded{" "}
+                {formatDateTime(
+                  doc.created_at,
+                )}
+              </span>
             </p>
           </div>
 
           {canReview && (
             <div className="shrink-0">
-              <DecisionButtons busy={busy} onDecision={onDecision} />
+              <DecisionButtons
+                busy={busy}
+                onDecision={onDecision}
+              />
             </div>
           )}
         </div>
       </header>
 
-      {/* ── Banners ── */}
-      {(notice || doc.status === "processing" || awaitingValidation) && (
+      {/* Deadline */}
+      <ApprovalDeadlineCard doc={doc} />
+
+      {/* Banners */}
+      {(notice ||
+        doc.status === "processing" ||
+        awaitingValidation ||
+        (doc.status === "pending_review" &&
+          countdown.urgent)) && (
         <div className="space-y-3">
           {notice && (
             <Banner
@@ -1164,25 +1772,51 @@ function DocumentReviewContent({
             </Banner>
           )}
 
-          {doc.status === "processing" && (
-            <Banner tone="info" icon="loader">
-              This document is still being processed. This page refreshes
+          {doc.status ===
+            "processing" && (
+            <Banner
+              tone="info"
+              icon="loader"
+            >
+              This document is still being
+              processed. This page refreshes
               automatically.
             </Banner>
           )}
 
           {awaitingValidation && (
-            <Banner tone="warning" icon="shield_alert">
-              Review actions are unavailable until AI validation has passed for
-              this document.
+            <Banner
+              tone="warning"
+              icon="shield_alert"
+            >
+              Review actions are unavailable
+              until AI validation has passed
+              for this document.
             </Banner>
           )}
+
+          {doc.status ===
+            "pending_review" &&
+            countdown.urgent &&
+            !countdown.overdue && (
+              <Banner
+                tone="warning"
+                icon="clock"
+              >
+                This approval deadline is
+                approaching.{" "}
+                <span className="font-bold">
+                  {countdown.label}
+                </span>{" "}
+                remaining.
+              </Banner>
+            )}
         </div>
       )}
 
-      {/* ── Body ── */}
+      {/* Body */}
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Main column */}
+        {/* Main */}
         <div className="space-y-6 lg:col-span-2">
           {/* Extracted information */}
           <SectionCard
@@ -1192,52 +1826,72 @@ function DocumentReviewContent({
             action={
               entries.length > 0 ? (
                 <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-                  {entries.length} {entries.length === 1 ? "field" : "fields"}
+                  {entries.length}{" "}
+                  {entries.length === 1
+                    ? "field"
+                    : "fields"}
                 </span>
               ) : undefined
             }
           >
-            {!extracted || entries.length === 0 ? (
+            {!extracted ||
+            entries.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
                 <p className="text-sm font-medium text-slate-600">
-                  No extracted information is available.
+                  No extracted information
+                  is available.
                 </p>
 
                 <p className="mt-1 text-xs text-slate-500">
-                  The document may not have been successfully processed.
+                  The document may not have
+                  been successfully processed.
                 </p>
               </div>
             ) : (
               <div className="space-y-8">
-                {simpleEntries.length > 0 && (
+                {simpleEntries.length >
+                  0 && (
                   <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
-                    {simpleEntries.map(([key, value]) => (
-                      <Field key={key} label={formatLabel(key)}>
-                        <ExtractedValue
-                          fieldKey={key}
-                          value={value}
-                          context={extracted}
-                        />
-                      </Field>
-                    ))}
+                    {simpleEntries.map(
+                      ([key, value]) => (
+                        <Field
+                          key={key}
+                          label={formatLabel(
+                            key,
+                          )}
+                        >
+                          <ExtractedValue
+                            fieldKey={key}
+                            value={value}
+                            context={
+                              extracted
+                            }
+                          />
+                        </Field>
+                      ),
+                    )}
                   </dl>
                 )}
 
-                {complexEntries.map(([key, value]) => (
-                  <div key={key}>
-                    <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                      {formatLabel(key)}
-                    </h3>
+                {complexEntries.map(
+                  ([key, value]) => (
+                    <div key={key}>
+                      <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                        {formatLabel(key)}
+                      </h3>
 
-                    <div className="text-sm font-medium text-slate-800">
-                      <ExtractedValue
-                        fieldKey={key}
-                        value={value}
-                        context={extracted}
-                      />
+                      <div className="text-sm font-medium text-slate-800">
+                        <ExtractedValue
+                          fieldKey={key}
+                          value={value}
+                          context={
+                            extracted
+                          }
+                        />
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ),
+                )}
               </div>
             )}
           </SectionCard>
@@ -1251,16 +1905,23 @@ function DocumentReviewContent({
             <dl className="grid gap-6 md:grid-cols-3">
               <Field label="Document Type">
                 <span className="text-base font-semibold">
-                  {formatCategory(doc.document_category)}
+                  {formatCategory(
+                    doc.document_category,
+                  )}
                 </span>
               </Field>
 
               <Field label="Confidence">
-                <ConfidenceBadge confidence={doc.classification_confidence} />
+                <ConfidenceBadge
+                  confidence={
+                    doc.classification_confidence
+                  }
+                />
               </Field>
 
               <Field label="Classification Status">
-                {doc.document_category === "unsupported"
+                {doc.document_category ===
+                "unsupported"
                   ? "Unsupported document"
                   : "Supported document"}
               </Field>
@@ -1284,10 +1945,14 @@ function DocumentReviewContent({
             description="Validation results produced during document processing."
             icon="shield_check"
           >
-            {doc.guardrail_passed === true ? (
+            {doc.guardrail_passed ===
+            true ? (
               <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-5">
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-                  <Icon name="shield_check" className="h-5 w-5" />
+                  <Icon
+                    name="shield_check"
+                    className="h-5 w-5"
+                  />
                 </span>
 
                 <div>
@@ -1296,15 +1961,20 @@ function DocumentReviewContent({
                   </h3>
 
                   <p className="mt-1 text-sm text-emerald-700">
-                    The extracted information passed the configured validation
-                    checks.
+                    The extracted information
+                    passed the configured
+                    validation checks.
                   </p>
                 </div>
               </div>
-            ) : doc.guardrail_passed === false ? (
+            ) : doc.guardrail_passed ===
+              false ? (
               <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-5">
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-700">
-                  <Icon name="shield_alert" className="h-5 w-5" />
+                  <Icon
+                    name="shield_alert"
+                    className="h-5 w-5"
+                  />
                 </span>
 
                 <div className="flex-1">
@@ -1312,24 +1982,34 @@ function DocumentReviewContent({
                     Guardrails Failed
                   </h3>
 
-                  {doc.guardrail_errors && doc.guardrail_errors.length > 0 ? (
+                  {doc.guardrail_errors &&
+                  doc.guardrail_errors
+                    .length > 0 ? (
                     <ul className="mt-3 space-y-2">
-                      {doc.guardrail_errors.map((guardrailError, index) => (
-                        <li
-                          key={index}
-                          className="flex items-start gap-2 text-sm text-red-700"
-                        >
-                          <span
-                            aria-hidden="true"
-                            className="mt-2 h-1 w-1 shrink-0 rounded-full bg-red-400"
-                          />
-                          {guardrailError}
-                        </li>
-                      ))}
+                      {doc.guardrail_errors.map(
+                        (
+                          guardrailError,
+                          index,
+                        ) => (
+                          <li
+                            key={index}
+                            className="flex items-start gap-2 text-sm text-red-700"
+                          >
+                            <span
+                              aria-hidden="true"
+                              className="mt-2 h-1 w-1 shrink-0 rounded-full bg-red-400"
+                            />
+
+                            {guardrailError}
+                          </li>
+                        ),
+                      )}
                     </ul>
                   ) : (
                     <p className="mt-1 text-sm text-red-700">
-                      Validation failed without a detailed error.
+                      Validation failed
+                      without a detailed
+                      error.
                     </p>
                   )}
                 </div>
@@ -1337,7 +2017,8 @@ function DocumentReviewContent({
             ) : (
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
                 <p className="text-sm text-slate-600">
-                  Guardrails have not been evaluated for this document.
+                  Guardrails have not been
+                  evaluated for this document.
                 </p>
               </div>
             )}
@@ -1358,9 +2039,9 @@ function DocumentReviewContent({
           )}
         </div>
 
-        {/* Side column */}
+        {/* Side */}
         <aside className="space-y-6">
-          {/* Review decision / outcome */}
+          {/* Review */}
           {canReview && (
             <section className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm lg:sticky lg:top-24">
               <h2 className="text-[15px] font-semibold text-slate-900">
@@ -1368,20 +2049,57 @@ function DocumentReviewContent({
               </h2>
 
               <p className="mt-1 text-sm leading-6 text-slate-500">
-                Review the AI-generated information before making an approval
-                decision.
+                Review the AI-generated
+                information before making an
+                approval decision.
               </p>
 
+              {doc.approval_deadline && (
+                <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                  <div className="flex items-start gap-3">
+                    <span className="mt-0.5 text-amber-600">
+                      <Icon name="clock" />
+                    </span>
+
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">
+                        Approval Deadline
+                      </p>
+
+                      <p className="mt-1 text-sm font-bold text-amber-900 tabular-nums">
+                        {countdown.overdue
+                          ? "Overdue"
+                          : countdown.label}
+                      </p>
+
+                      <p className="mt-1 text-xs text-amber-700">
+                        {formatDateTime(
+                          doc.approval_deadline,
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="mt-5">
-                <DecisionButtons busy={busy} onDecision={onDecision} stacked />
+                <DecisionButtons
+                  busy={busy}
+                  onDecision={onDecision}
+                  stacked
+                />
               </div>
             </section>
           )}
 
+          {/* Approved */}
           {doc.status === "approved" && (
             <section className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-6">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-                <Icon name="check_circle" className="h-5 w-5" />
+                <Icon
+                  name="check_circle"
+                  className="h-5 w-5"
+                />
               </span>
 
               <div>
@@ -1390,17 +2108,22 @@ function DocumentReviewContent({
                 </h2>
 
                 <p className="mt-1 text-sm text-emerald-700">
-                  This document has completed the approval stage.
+                  This document has completed
+                  the approval stage.
                 </p>
               </div>
             </section>
           )}
 
+          {/* Rejected */}
           {doc.status === "rejected" && (
             <section className="rounded-2xl border border-red-200 bg-red-50 p-6">
               <div className="flex items-start gap-3">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-700">
-                  <Icon name="x_circle" className="h-5 w-5" />
+                  <Icon
+                    name="x_circle"
+                    className="h-5 w-5"
+                  />
                 </span>
 
                 <div className="min-w-0">
@@ -1409,7 +2132,8 @@ function DocumentReviewContent({
                   </h2>
 
                   <p className="mt-1 text-sm text-red-700">
-                    This document was rejected during the review process.
+                    This document was rejected
+                    during the review process.
                   </p>
                 </div>
               </div>
@@ -1436,19 +2160,80 @@ function DocumentReviewContent({
           >
             <dl className="space-y-5">
               <Field label="Status">
-                <StatusBadge status={doc.status} />
+                <StatusBadge
+                  status={doc.status}
+                />
               </Field>
 
               <Field label="AI Validation">
-                <ValidationBadge passed={doc.guardrail_passed} />
+                <ValidationBadge
+                  passed={
+                    doc.guardrail_passed
+                  }
+                />
               </Field>
 
               <Field label="Indexed for RAG">
                 <span className="inline-flex items-center gap-1.5">
-                  <Icon name="database" className="h-4 w-4 text-slate-400" />
-                  {doc.guardrail_passed ? "Yes" : "No"}
+                  <Icon
+                    name="database"
+                    className="h-4 w-4 text-slate-400"
+                  />
+
+                  {doc.guardrail_passed
+                    ? "Yes"
+                    : "No"}
                 </span>
               </Field>
+
+              {doc.status ===
+                "pending_review" && (
+                <>
+                  <Field label="Approval Deadline">
+                    {doc.approval_deadline ? (
+                      <div className="space-y-1">
+                        <p className="font-semibold text-slate-900">
+                          {formatDateTime(
+                            doc.approval_deadline,
+                          )}
+                        </p>
+
+                        <p
+                          className={`text-xs font-semibold ${
+                            countdown.overdue
+                              ? "text-red-600"
+                              : countdown.urgent
+                                ? "text-orange-600"
+                                : "text-amber-600"
+                          }`}
+                        >
+                          {countdown.overdue
+                            ? "Deadline passed"
+                            : `${countdown.label} remaining`}
+                        </p>
+                      </div>
+                    ) : (
+                      "Not scheduled"
+                    )}
+                  </Field>
+
+                  <Field label="Calendar Reminder">
+                    <span className="inline-flex items-center gap-2">
+                      <span
+                        className={`h-2 w-2 rounded-full ${
+                          doc.calendar_event_created
+                            ? "bg-emerald-500"
+                            : "bg-slate-400"
+                        }`}
+                      />
+
+                      {doc.calendar_event_created
+                        ? "Scheduled"
+                        : "Not scheduled"}
+                    </span>
+                  </Field>
+                </>
+              )}
             </dl>
           </SectionCard>
 
@@ -1460,22 +2245,39 @@ function DocumentReviewContent({
           >
             <dl className="space-y-5">
               <Field label="File Name">
-                <span className="break-all">{doc.file_name}</span>
+                <span className="break-all">
+                  {doc.file_name}
+                </span>
               </Field>
 
               <div className="grid grid-cols-2 gap-5">
-                <Field label="File Type">{doc.file_type}</Field>
-                <Field label="File Size">{formatFileSize(doc.file_size)}</Field>
+                <Field label="File Type">
+                  {doc.file_type}
+                </Field>
+
+                <Field label="File Size">
+                  {formatFileSize(
+                    doc.file_size,
+                  )}
+                </Field>
               </div>
 
               <Field label="Category">
-                {formatCategory(doc.document_category)}
+                {formatCategory(
+                  doc.document_category,
+                )}
               </Field>
 
-              <Field label="Uploaded">{formatDateTime(doc.created_at)}</Field>
+              <Field label="Uploaded">
+                {formatDateTime(
+                  doc.created_at,
+                )}
+              </Field>
 
               <Field label="Last Updated">
-                {formatDateTime(doc.updated_at)}
+                {formatDateTime(
+                  doc.updated_at,
+                )}
               </Field>
             </dl>
           </SectionCard>
@@ -1485,46 +2287,77 @@ function DocumentReviewContent({
   );
 }
 
-function DashboardShell({ children }: { children: ReactNode }) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+/* -------------------------------------------------------------------------- */
+/* Dashboard shell                                                            */
+/* -------------------------------------------------------------------------- */
+
+function DashboardShell({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  const [sidebarOpen, setSidebarOpen] =
+    useState(false);
 
   return (
     <div className="min-h-screen bg-[#f8fafc]">
       <DashboardSidebar
         open={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
+        onClose={() =>
+          setSidebarOpen(false)
+        }
       />
 
       <div className="lg:pl-62.5">
-        <DashboardHeader onMenuClick={() => setSidebarOpen(true)} />
+        <DashboardHeader
+          onMenuClick={() =>
+            setSidebarOpen(true)
+          }
+        />
 
         <main className="p-4 sm:p-6 lg:p-8">
-          <div className="mx-auto max-w-350">{children}</div>
+          <div className="mx-auto max-w-350">
+            {children}
+          </div>
         </main>
       </div>
     </div>
   );
 }
 
-// Page
+/* -------------------------------------------------------------------------- */
+/* Page                                                                       */
+/* -------------------------------------------------------------------------- */
 
-const SUCCESS_MESSAGE: Record<ReviewDecision, string> = {
+const SUCCESS_MESSAGE: Record<
+  ReviewDecision,
+  string
+> = {
   approve: "Document approved successfully.",
   reject: "Document rejected.",
 };
 
-const FAILURE_MESSAGE: Record<ReviewDecision, string> = {
+const FAILURE_MESSAGE: Record<
+  ReviewDecision,
+  string
+> = {
   approve: "Failed to approve the document.",
   reject: "Failed to reject the document.",
 };
 
 export default function DocumentReviewPage() {
-  const params = useParams<{ id: string }>();
+  const params = useParams<{
+    id: string;
+  }>();
+
   const router = useRouter();
 
   const documentId = Number(params.id);
-  const user = useAuthStore((state) => state.user);
-  // All data fetching + mutations live in the hook
+
+  const user = useAuthStore(
+    (state) => state.user,
+  );
+
   const {
     isValidId,
     document: doc,
@@ -1534,23 +2367,41 @@ export default function DocumentReviewPage() {
     error,
     refetch,
     decide,
-  } = useDocumentReview(documentId, user?.role);
-  const [pendingDecision, setPendingDecision] = useState<ReviewDecision | null>(
-    null,
+  } = useDocumentReview(
+    documentId,
+    user?.role,
   );
-  const [notice, setNotice] = useState("");
+
+  const [
+    pendingDecision,
+    setPendingDecision,
+  ] =
+    useState<ReviewDecision | null>(
+      null,
+    );
+
+  const [notice, setNotice] =
+    useState("");
+
   const goBack = () => router.back();
-  const openDecision = (decision: ReviewDecision) => {
-    decide.reset(); // clear any previous error
+
+  const openDecision = (
+    decision: ReviewDecision,
+  ) => {
+    decide.reset();
     setNotice("");
     setPendingDecision(decision);
   };
 
   const closeDialog = () => {
-    if (!decide.isPending) setPendingDecision(null);
+    if (!decide.isPending) {
+      setPendingDecision(null);
+    }
   };
 
-  const confirmDecision = (reason?: string) => {
+  const confirmDecision = (
+    reason?: string,
+  ) => {
     if (!pendingDecision) return;
 
     const decision = pendingDecision;
@@ -1563,7 +2414,9 @@ export default function DocumentReviewPage() {
       {
         onSuccess: () => {
           setPendingDecision(null);
-          setNotice(SUCCESS_MESSAGE[decision]);
+          setNotice(
+            SUCCESS_MESSAGE[decision],
+          );
         },
       },
     );
@@ -1589,7 +2442,10 @@ export default function DocumentReviewPage() {
             ? "Document not found"
             : "Document could not be loaded"
         }
-        message={getApiErrorMessage(error, "Unable to load this document.")}
+        message={getApiErrorMessage(
+          error,
+          "Unable to load this document.",
+        )}
         onRetry={() => refetch()}
         onBack={goBack}
       />
@@ -1601,7 +2457,9 @@ export default function DocumentReviewPage() {
         canReview={canReview}
         busy={decide.isPending}
         notice={notice}
-        onDismissNotice={() => setNotice("")}
+        onDismissNotice={() =>
+          setNotice("")
+        }
         onDecision={openDecision}
         onBack={goBack}
       />
@@ -1610,7 +2468,9 @@ export default function DocumentReviewPage() {
 
   return (
     <ProtectedRoute>
-      <DashboardShell>{body}</DashboardShell>
+      <DashboardShell>
+        {body}
+      </DashboardShell>
 
       {pendingDecision && doc && (
         <ConfirmDialog
@@ -1621,7 +2481,9 @@ export default function DocumentReviewPage() {
             decide.isError
               ? getApiErrorMessage(
                   decide.error,
-                  FAILURE_MESSAGE[pendingDecision],
+                  FAILURE_MESSAGE[
+                    pendingDecision
+                  ],
                 )
               : undefined
           }

@@ -37,7 +37,7 @@ export const NAV = [
   },
   {
     label: "Settings",
-    href: "/settings",
+    href: "/dashboard/settings",
     icon: "settings",
   },
 ];

@@ -349,7 +349,8 @@ export default function ChatAssistant({
       setCopiedId(message.id);
 
       setTimeout(
-        () => setCopiedId((current) => (current === message.id ? null : current)),
+        () =>
+          setCopiedId((current) => (current === message.id ? null : current)),
         1800,
       );
     } catch {
@@ -599,12 +600,12 @@ export default function ChatAssistant({
       </div>
 
       {/* Composer */}
-      <div className="shrink-0 border-t border-slate-200 bg-white px-4 py-4 sm:px-6">
+      <div className="shrink-0 border-t border-slate-200 bg-white px-4 py-1.5 sm:px-6">
         <div className="mx-auto w-full max-w-3xl">
           {/* Quick follow-ups once a conversation has started */}
           {hasDocument && messages.length > 0 && (
             <div
-              className="mb-3 flex gap-2 overflow-x-auto pb-1"
+              className="mb-2 flex gap-2 overflow-x-auto pb-1"
               aria-label="Suggested questions"
             >
               {suggestions.map((suggestion) => (
@@ -613,7 +614,7 @@ export default function ChatAssistant({
                   type="button"
                   disabled={loading}
                   onClick={() => handleSuggestion(suggestion)}
-                  className={`shrink-0 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600 shadow-sm transition hover:border-[#315bdc] hover:text-[#315bdc] disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`}
+                  className={`shrink-0 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600 shadow-sm transition hover:border-[#315bdc] hover:text-[#315bdc] disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`}
                 >
                   {suggestion}
                 </button>
@@ -623,7 +624,7 @@ export default function ChatAssistant({
 
           <form ref={formRef} onSubmit={handleSubmit}>
             <div
-              className={`flex items-end gap-2 rounded-xl border p-2 shadow-sm transition focus-within:border-[#315bdc] focus-within:ring-2 focus-within:ring-[#315bdc]/20 ${
+              className={`flex items-end gap-2 rounded-lg border p-1 shadow-sm transition focus-within:border-[#315bdc] focus-within:ring-2 focus-within:ring-[#315bdc]/20 ${
                 hasDocument
                   ? "border-slate-300 bg-white"
                   : "border-slate-200 bg-slate-50"
@@ -642,14 +643,14 @@ export default function ChatAssistant({
                     ? "Ask a question about this document..."
                     : "Select a document first..."
                 }
-                className="max-h-40 min-h-10 flex-1 resize-none bg-transparent px-2.5 py-2 text-sm leading-6 text-slate-900 placeholder:text-slate-400 focus:outline-none disabled:cursor-not-allowed"
+                className="max-h-32 min-h-8 flex-1 resize-none bg-transparent px-2.5 py-1.5 text-sm leading-5 text-slate-900 placeholder:text-slate-400 focus:outline-none disabled:cursor-not-allowed"
               />
 
               <button
                 type="submit"
                 disabled={!canSend}
                 aria-label={loading ? "Waiting for answer" : "Send question"}
-                className={`inline-flex h-10 shrink-0 items-center gap-2 rounded-lg bg-[#315bdc] px-4 text-sm font-medium text-white shadow-sm transition hover:bg-[#274dc4] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 ${focusRing}`}
+                className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-[#315bdc] px-3 text-sm font-medium text-white shadow-sm transition hover:bg-[#274dc4] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 ${focusRing}`}
               >
                 <Icon
                   name={loading ? "loader" : "send"}
@@ -661,7 +662,7 @@ export default function ChatAssistant({
             </div>
           </form>
 
-          <p className="mt-2 text-center text-[11px] text-slate-400">
+          <p className="mt-1 text-center text-[11px] text-slate-400">
             Answers are generated from the selected document. Verify critical
             details.
             <span className="hidden sm:inline">

@@ -72,6 +72,19 @@ export interface DocumentProcessingResponse {
   indexed: boolean;
 }
 
+export interface ConversationMessage {
+  id: number;
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+}
+
+export interface ConversationHistoryResponse {
+  conversation_id: number | null;
+  document_id: number;
+  messages: ConversationMessage[];
+}
+
 export interface DocumentQASource {
   document_id: number;
   page: number | null;
@@ -148,6 +161,16 @@ export async function askDocumentQuestion(
     {
       question,
     },
+  );
+
+  return response.data;
+}
+
+export async function getDocumentQAHistory(
+  documentId: number,
+): Promise<ConversationHistoryResponse> {
+  const response = await api.get<ConversationHistoryResponse>(
+    `/documents/${documentId}/qa/history`,
   );
 
   return response.data;

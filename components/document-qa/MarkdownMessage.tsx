@@ -13,8 +13,8 @@ import remarkGfm from "remark-gfm";
 const focusRing =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#315bdc]";
 
-// ── Helpers ───────────────────────────────────────────────────────────────
-/** Plain text of a React node (used to copy code blocks) */
+
+/** Plain text of a React node (used to copy code blocks). */
 function nodeToText(node: ReactNode): string {
   if (typeof node === "string" || typeof node === "number") {
     return String(node);
@@ -31,7 +31,6 @@ function nodeToText(node: ReactNode): string {
   return "";
 }
 
-// ── Code block (language label + copy button) ─────────────────────────────
 function CodeBlock({ children }: { children?: ReactNode }) {
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -43,7 +42,6 @@ function CodeBlock({ children }: { children?: ReactNode }) {
     [],
   );
 
-  // <pre> contains a single <code className="language-xyz">
   const codeElement = Array.isArray(children) ? children[0] : children;
 
   const codeProps = isValidElement(codeElement)
@@ -56,21 +54,19 @@ function CodeBlock({ children }: { children?: ReactNode }) {
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(text);
-
       setCopied(true);
 
       if (timer.current) clearTimeout(timer.current);
-
       timer.current = setTimeout(() => setCopied(false), 1800);
     } catch {
-      /* clipboard not available - nothing to do */
+      /* clipboard not available, nothing to do */
     }
   };
 
   return (
-    <div className="mb-3 overflow-hidden rounded-lg border border-slate-800 bg-slate-900 shadow-sm last:mb-0">
+    <div className="mb-3 overflow-hidden rounded-md border border-slate-800 bg-slate-900 last:mb-0">
       <div className="flex items-center justify-between border-b border-white/10 bg-white/5 px-3 py-1.5">
-        <span className="font-mono text-[11px] font-medium uppercase tracking-wider text-slate-400">
+        <span className="font-mono text-xs font-medium text-slate-400">
           {language ?? "text"}
         </span>
 
@@ -78,7 +74,7 @@ function CodeBlock({ children }: { children?: ReactNode }) {
           type="button"
           onClick={handleCopy}
           aria-label={copied ? "Code copied" : "Copy code"}
-          className={`inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[11px] font-medium text-slate-400 transition hover:bg-white/10 hover:text-white ${focusRing}`}
+          className={`inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 text-xs font-medium text-slate-400 transition hover:bg-white/10 hover:text-white ${focusRing}`}
         >
           <svg
             aria-hidden="true"
@@ -111,10 +107,19 @@ function CodeBlock({ children }: { children?: ReactNode }) {
   );
 }
 
-// ── Element styles ────────────────────────────────────────────────────────
+/* -------------------------------------------------------------------------- */
+/* Element styles                                                             */
+/* -------------------------------------------------------------------------- */
+
+const smallHeading = ({ children }: { children?: ReactNode }) => (
+  <h4 className="mb-1.5 mt-4 text-[13px] font-semibold text-slate-600 first:mt-0">
+    {children}
+  </h4>
+);
+
 const components: Components = {
   h1: ({ children }) => (
-    <h1 className="mb-3 mt-5 border-b border-slate-200 pb-2 text-[17px] font-semibold tracking-tight text-slate-900 first:mt-0">
+    <h1 className="mb-3 mt-6 border-b border-slate-200 pb-2 text-base font-semibold tracking-tight text-slate-900 first:mt-0">
       {children}
     </h1>
   ),
@@ -128,27 +133,15 @@ const components: Components = {
       {children}
     </h3>
   ),
-  h4: ({ children }) => (
-    <h4 className="mb-1.5 mt-4 text-[11px] font-semibold uppercase tracking-wider text-slate-500 first:mt-0">
-      {children}
-    </h4>
-  ),
-  h5: ({ children }) => (
-    <h5 className="mb-1.5 mt-4 text-[11px] font-semibold uppercase tracking-wider text-slate-500 first:mt-0">
-      {children}
-    </h5>
-  ),
-  h6: ({ children }) => (
-    <h6 className="mb-1.5 mt-4 text-[11px] font-semibold uppercase tracking-wider text-slate-500 first:mt-0">
-      {children}
-    </h6>
-  ),
+  h4: smallHeading,
+  h5: smallHeading,
+  h6: smallHeading,
 
   p: ({ children }) => (
-    <p className="mb-3 leading-relaxed last:mb-0">{children}</p>
+    <p className="mb-3 max-w-prose leading-relaxed last:mb-0">{children}</p>
   ),
 
-  // Lists (task lists from GitHub-style markdown lose their bullets)
+  // Lists (GitHub-style task lists lose their bullets)
   ul: ({ className, children }) => (
     <ul
       className={`mb-3 space-y-1.5 last:mb-0 [&_ol]:mt-1.5 [&_ul]:mt-1.5 ${
@@ -216,36 +209,39 @@ const components: Components = {
     );
   },
 
-  // Callout-style quote
+  // Note-style quote
   blockquote: ({ children }) => (
-    <blockquote className="mb-3 rounded-r-lg border-l-4 border-[#315bdc]/40 bg-blue-50/50 py-2 pl-4 pr-3 text-slate-700 last:mb-0 [&>p]:mb-0">
+    <blockquote className="mb-3 rounded-r-md border-l-4 border-[#315bdc]/50 bg-slate-50 py-2 pl-4 pr-3 text-slate-700 last:mb-0 [&>p]:mb-0">
       {children}
     </blockquote>
   ),
 
   hr: () => <hr className="my-4 border-slate-200" />,
 
-  // Code: blocks get a header with copy button, inline code gets a subtle chip
+  // Code: blocks get a header with a copy button, inline code gets a quiet chip
   pre: ({ children }) => <CodeBlock>{children}</CodeBlock>,
   code: ({ children }) => (
-    <code className="rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-[0.85em] text-slate-800 ring-1 ring-inset ring-slate-200">
+    <code className="rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 font-mono text-[0.85em] text-slate-800">
       {children}
     </code>
   ),
 
   // Tables
   table: ({ children }) => (
-    <div className="mb-3 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm last:mb-0">
-      <table className="min-w-full border-collapse text-xs [&_tbody_tr:last-child_td]:border-b-0 [&_tbody_tr:nth-child(even)]:bg-slate-50/60">
+    <div className="mb-3 overflow-x-auto rounded-md border border-slate-200 last:mb-0">
+      <table className="min-w-full border-collapse text-[13px] [&_tbody_tr:last-child_td]:border-b-0 [&_tbody_tr:nth-child(even)]:bg-slate-50/60">
         {children}
       </table>
     </div>
   ),
-  thead: ({ children }) => <thead className="bg-slate-50">{children}</thead>,
+  thead: ({ children }) => (
+    <thead className="border-b border-slate-200 bg-slate-50">{children}</thead>
+  ),
   th: ({ children, style }) => (
     <th
       style={style}
-      className="whitespace-nowrap border-b border-slate-200 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500"
+      scope="col"
+      className="whitespace-nowrap px-3 py-2 text-left text-xs font-semibold text-slate-600"
     >
       {children}
     </th>
@@ -253,26 +249,27 @@ const components: Components = {
   td: ({ children, style }) => (
     <td
       style={style}
-      className="border-b border-slate-100 px-3 py-2 align-top text-slate-700"
+      className="border-b border-slate-100 px-3 py-2 align-top tabular-nums text-slate-700"
     >
       {children}
     </td>
   ),
 
   img: ({ src, alt }) => (
+    // eslint-disable-next-line @next/next/no-img-element
     <img
       src={typeof src === "string" ? src : undefined}
       alt={alt ?? ""}
       loading="lazy"
-      className="my-3 max-w-full rounded-lg border border-slate-200"
+      className="my-3 max-w-full rounded-md border border-slate-200"
     />
   ),
 };
 
-//Component 
+
 export default function MarkdownMessage({ content }: { content: string }) {
   return (
-    <div className="min-w-0 wrap-break-words text-sm leading-relaxed text-slate-700">
+    <div className="min-w-0 wrap-break-word text-sm leading-relaxed text-slate-700">
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
         {content}
       </ReactMarkdown>

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { isAxiosError } from "axios";
@@ -11,9 +10,7 @@ import {
   useState,
 } from "react";
 
-import {
-  type DocumentQAResponse,
-} from "@/services/documentService";
+import { type DocumentQAResponse } from "@/services/documentService";
 import { useDocumentChatStore } from "@/store/documentChatStore";
 import MarkdownMessage from "./MarkdownMessage";
 
@@ -31,7 +28,9 @@ const suggestions = [
 const focusRing =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#315bdc]";
 
-// ── Icons ────────────────────────────────────────────────────────────────
+/* -------------------------------------------------------------------------- */
+/* Icons                                                                      */
+/* -------------------------------------------------------------------------- */
 
 const ICONS: Record<string, ReactNode> = {
   send: (
@@ -40,16 +39,13 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M22 2 11 13" />
     </>
   ),
-
   copy: (
     <>
       <rect x="9" y="9" width="13" height="13" rx="2" />
       <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
     </>
   ),
-
   check: <path d="M20 6 9 17l-5-5" />,
-
   refresh: (
     <>
       <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
@@ -58,7 +54,6 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M8 16H3v5" />
     </>
   ),
-
   trash: (
     <>
       <path d="M3 6h18" />
@@ -67,11 +62,9 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M10 11v6M14 11v6" />
     </>
   ),
-
   sparkles: (
     <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" />
   ),
-
   file: (
     <>
       <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
@@ -79,29 +72,14 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M10 9H8M16 13H8M16 17H8" />
     </>
   ),
-
-  book: (
-    <>
-      <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
-    </>
-  ),
-
-  shield_check: (
-    <>
-      <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
-      <path d="m9 12 2 2 4-4" />
-    </>
-  ),
-
+  book: <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />,
   alert: (
     <>
       <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" />
       <path d="M12 9v4M12 17h.01" />
     </>
   ),
-
   chevron_right: <path d="m9 18 6-6-6-6" />,
-
   loader: <path d="M21 12a9 9 0 1 1-6.219-8.56" />,
 };
 
@@ -128,7 +106,9 @@ function Icon({
   );
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────
+/* -------------------------------------------------------------------------- */
+/* Helpers                                                                    */
+/* -------------------------------------------------------------------------- */
 
 const formatTime = (value: string) =>
   new Date(value).toLocaleTimeString("en-IN", {
@@ -136,20 +116,15 @@ const formatTime = (value: string) =>
     minute: "2-digit",
   });
 
-function uniqueSources(
-  sources: DocumentQAResponse["sources"] | undefined,
-) {
+function uniqueSources(sources: DocumentQAResponse["sources"] | undefined) {
   if (!sources) return [];
 
   const seen = new Set<string>();
 
   return sources.filter((source) => {
     const key = `${source.document_id}-${source.page ?? ""}`;
-
     if (seen.has(key)) return false;
-
     seen.add(key);
-
     return true;
   });
 }
@@ -161,29 +136,20 @@ function getQuestionError(error: unknown) {
     }
 
     const detail = error.response.data?.detail;
-
-    if (typeof detail === "string" && detail) {
-      return detail;
-    }
+    if (typeof detail === "string" && detail) return detail;
   }
 
   return "Unable to get an answer from this document.";
 }
 
-// ── Small pieces ─────────────────────────────────────────────────────────
+/* -------------------------------------------------------------------------- */
+/* Small pieces                                                               */
+/* -------------------------------------------------------------------------- */
 
-function Avatar({ kind }: { kind: "user" | "assistant" }) {
-  if (kind === "assistant") {
-    return (
-      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-[#315bdc] ring-1 ring-inset ring-blue-100">
-        <Icon name="sparkles" className="h-4 w-4" />
-      </span>
-    );
-  }
-
+function AssistantMark() {
   return (
-    <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-200 text-[10px] font-bold uppercase tracking-wide text-slate-600">
-      You
+    <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[#315bdc] text-white">
+      <Icon name="sparkles" className="h-3.5 w-3.5" />
     </span>
   );
 }
@@ -195,32 +161,29 @@ function TypingIndicator() {
       aria-label="The assistant is searching the document"
       className="flex items-start gap-3"
     >
-      <Avatar kind="assistant" />
+      <AssistantMark />
 
-      <div className="flex items-center gap-3 rounded-xl rounded-tl-sm border border-slate-200 bg-white px-4 py-3 shadow-sm">
-        <span className="flex items-center gap-1" aria-hidden="true">
-          {[0, 150, 300].map((delay) => (
-            <span
-              key={delay}
-              style={{ animationDelay: `${delay}ms` }}
-              className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 motion-reduce:animate-none"
-            />
-          ))}
-        </span>
-
-        <span className="text-sm text-slate-500">
+      <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-4">
+        <div className="flex items-center gap-2 text-[13px] font-medium text-slate-600">
+          <Icon name="loader" className="h-3.5 w-3.5 animate-spin text-[#315bdc] motion-reduce:animate-none" />
           Searching the document...
-        </span>
+        </div>
+
+        <div className="mt-3 space-y-2" aria-hidden="true">
+          <div className="h-2.5 w-full animate-pulse rounded bg-slate-100 motion-reduce:animate-none" />
+          <div className="h-2.5 w-4/5 animate-pulse rounded bg-slate-100 motion-reduce:animate-none" />
+          <div className="h-2.5 w-3/5 animate-pulse rounded bg-slate-100 motion-reduce:animate-none" />
+        </div>
       </div>
     </div>
   );
 }
 
-// ── Component ─────────────────────────────────────────────────────────────
+/* -------------------------------------------------------------------------- */
+/* Component                                                                  */
+/* -------------------------------------------------------------------------- */
 
-export default function ChatAssistant({
-  selectedDocumentId,
-}: ChatAssistantProps) {
+export default function ChatAssistant({ selectedDocumentId }: ChatAssistantProps) {
   const [question, setQuestion] = useState("");
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [error, setError] = useState("");
@@ -243,38 +206,28 @@ export default function ChatAssistant({
     ? messagesByDocument[selectedDocumentId] ?? []
     : [];
 
-  // Load saved conversation whenever document changes
+  // Load saved conversation whenever the document changes
   useEffect(() => {
-    if (!selectedDocumentId) {
-      setQuestion("");
-      setError("");
-      setFailedQuestion(null);
-      return;
-    }
-
     setQuestion("");
     setError("");
     setFailedQuestion(null);
 
+    if (!selectedDocumentId) return;
+
     void loadHistory(selectedDocumentId);
   }, [selectedDocumentId, loadHistory]);
 
-  // Scroll to newest message
+  // Scroll to the newest message
   useEffect(() => {
     const list = listRef.current;
-
     if (!list) return;
 
-    list.scrollTo({
-      top: list.scrollHeight,
-      behavior: "smooth",
-    });
+    list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
   }, [messages, sendingMessage, error]);
 
-  // Grow textarea
+  // Grow the textarea with its content
   useEffect(() => {
     const textarea = textareaRef.current;
-
     if (!textarea) return;
 
     textarea.style.height = "auto";
@@ -285,14 +238,7 @@ export default function ChatAssistant({
     event.preventDefault();
 
     const trimmedQuestion = question.trim();
-
-    if (
-      !trimmedQuestion ||
-      !selectedDocumentId ||
-      sendingMessage
-    ) {
-      return;
-    }
+    if (!trimmedQuestion || !selectedDocumentId || sendingMessage) return;
 
     setQuestion("");
     setError("");
@@ -309,14 +255,8 @@ export default function ChatAssistant({
   };
 
   // Enter sends, Shift + Enter creates a new line
-  const handleKeyDown = (
-    event: KeyboardEvent<HTMLTextAreaElement>,
-  ) => {
-    if (
-      event.key === "Enter" &&
-      !event.shiftKey &&
-      !event.nativeEvent.isComposing
-    ) {
+  const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault();
       formRef.current?.requestSubmit();
     }
@@ -327,19 +267,13 @@ export default function ChatAssistant({
     textareaRef.current?.focus();
   };
 
-  const handleCopy = async (
-    message: (typeof messages)[number],
-  ) => {
+  const handleCopy = async (message: (typeof messages)[number]) => {
     try {
       await navigator.clipboard.writeText(message.content);
-
       setCopiedId(message.id);
 
       setTimeout(
-        () =>
-          setCopiedId((current) =>
-            current === message.id ? null : current,
-          ),
+        () => setCopiedId((current) => (current === message.id ? null : current)),
         1800,
       );
     } catch {
@@ -356,9 +290,7 @@ export default function ChatAssistant({
   };
 
   const retryQuestion = async () => {
-    if (!selectedDocumentId || !failedQuestion || sendingMessage) {
-      return;
-    }
+    if (!selectedDocumentId || !failedQuestion || sendingMessage) return;
 
     setError("");
     setFailedQuestion(null);
@@ -375,54 +307,55 @@ export default function ChatAssistant({
 
   const hasDocument = selectedDocumentId !== null;
   const canSend =
-    hasDocument &&
-    question.trim().length > 0 &&
-    !sendingMessage &&
-    !loadingHistory;
+    hasDocument && question.trim().length > 0 && !sendingMessage && !loadingHistory;
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
       {/* Header */}
-      <header className="flex shrink-0 items-center justify-between gap-4 border-b border-slate-200 bg-white px-5 py-3.5">
+      <header className="flex shrink-0 items-center justify-between gap-4 border-b border-slate-200 bg-white px-5 py-3">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#315bdc] text-white shadow-sm">
-            <Icon name="shield_check" className="h-4.5 w-4.5" />
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#315bdc] text-white">
+            <Icon name="sparkles" className="h-4 w-4" />
           </span>
 
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-slate-900">
-              Document Assistant
-            </h2>
+            <h2 className="text-sm font-semibold text-slate-900">Document Q&amp;A</h2>
 
-            <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
               {hasDocument ? (
                 <>
-                  <span>
-                    Scoped to document #{selectedDocumentId}
+                  <span className="inline-flex items-center gap-1.5 font-medium text-slate-700">
+                    <Icon name="file" className="h-3.5 w-3.5 text-slate-400" />
+                    Document #{selectedDocumentId}
                   </span>
 
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
+                  <span className="inline-flex items-center gap-1.5">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                     Conversation saved
                   </span>
                 </>
               ) : (
-                "Select a document to begin"
+                <span>Select a document to begin</span>
               )}
-            </p>
+            </div>
           </div>
         </div>
 
         {messages.length > 0 && (
-          <button
-            type="button"
-            onClick={clearConversation}
-            className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900 ${focusRing}`}
-          >
-            <Icon name="trash" className="h-3.5 w-3.5" />
-            Clear
-          </button>
+          <div className="flex shrink-0 items-center gap-3">
+            <span className="hidden text-xs tabular-nums text-slate-500 sm:inline">
+              {messages.length} {messages.length === 1 ? "message" : "messages"}
+            </span>
+
+            <button
+              type="button"
+              onClick={clearConversation}
+              className={`inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-red-300 hover:bg-red-50 hover:text-red-700 ${focusRing}`}
+            >
+              <Icon name="trash" className="h-3.5 w-3.5" />
+              Clear conversation
+            </button>
+          </div>
         )}
       </header>
 
@@ -432,37 +365,28 @@ export default function ChatAssistant({
         role="log"
         aria-live="polite"
         aria-label="Conversation"
-        className="min-h-0 flex-1 overflow-y-auto bg-slate-50/60 px-4 py-6 sm:px-6"
+        className="min-h-0 flex-1 overflow-y-auto bg-[#f8f9fb] px-4 py-6 sm:px-6"
       >
         <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col gap-6">
-
           {/* No document */}
           {!hasDocument && (
             <div className="my-auto text-center">
-              <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
-                <Icon name="file" className="h-6 w-6" />
+              <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400">
+                <Icon name="file" className="h-5 w-5" />
               </span>
 
-              <p className="mt-4 text-sm font-semibold text-slate-700">
-                Select a document
-              </p>
-
-              <p className="mx-auto mt-1 max-w-xs text-sm text-slate-500">
-                Choose a document from the left to start asking questions.
+              <p className="mt-4 text-sm font-semibold text-slate-800">No document selected</p>
+              <p className="mx-auto mt-1 max-w-xs text-[13px] leading-5 text-slate-500">
+                Choose a document from the list to start asking questions about it.
               </p>
             </div>
           )}
 
           {/* Loading history */}
           {hasDocument && loadingHistory && (
-            <div className="my-auto flex items-center justify-center">
-              <div className="flex items-center gap-2 text-sm text-slate-500">
-                <Icon
-                  name="loader"
-                  className="h-4 w-4 animate-spin"
-                />
-                Loading conversation...
-              </div>
+            <div className="my-auto flex items-center justify-center gap-2 text-[13px] text-slate-500">
+              <Icon name="loader" className="h-4 w-4 animate-spin motion-reduce:animate-none" />
+              Loading conversation...
             </div>
           )}
 
@@ -473,40 +397,40 @@ export default function ChatAssistant({
             !sendingMessage &&
             !error && (
               <div className="my-auto">
-                <div className="text-center">
-                  <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-[#315bdc] ring-1 ring-inset ring-blue-100">
-                    <Icon name="sparkles" className="h-6 w-6" />
-                  </span>
-
-                  <h3 className="mt-4 text-lg font-semibold tracking-tight text-slate-900">
-                    Ask anything about this document
+                <div className="max-w-xl">
+                  <h3 className="text-lg font-semibold tracking-tight text-slate-900">
+                    Ask a question about this document
                   </h3>
 
-                  <p className="mx-auto mt-1.5 max-w-md text-sm leading-6 text-slate-500">
-                    I answer using the selected document only. Your
-                    conversation history is saved and will be restored when
-                    you select this document again.
+                  <p className="mt-1.5 text-[13px] leading-6 text-slate-600">
+                    Answers use the selected document only. Your conversation is saved and comes back
+                    when you reopen this document.
                   </p>
                 </div>
 
-                <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                  {suggestions.map((suggestion) => (
-                    <button
-                      key={suggestion}
-                      type="button"
-                      onClick={() => handleSuggestion(suggestion)}
-                      className={`group flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-[#315bdc] hover:shadow-md ${focusRing}`}
-                    >
-                      <span className="text-sm leading-5 text-slate-700">
-                        {suggestion}
-                      </span>
+                <div className="mt-5 overflow-hidden rounded-lg border border-slate-200 bg-white">
+                  <p className="border-b border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-500">
+                    Suggested questions
+                  </p>
 
-                      <Icon
-                        name="chevron_right"
-                        className="mt-0.5 h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-[#315bdc]"
-                      />
-                    </button>
-                  ))}
+                  <ul className="divide-y divide-slate-100">
+                    {suggestions.map((suggestion) => (
+                      <li key={suggestion}>
+                        <button
+                          type="button"
+                          onClick={() => handleSuggestion(suggestion)}
+                          className={`group flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-slate-50 ${focusRing}`}
+                        >
+                          <span className="text-[13px] text-slate-800">{suggestion}</span>
+
+                          <Icon
+                            name="chevron_right"
+                            className="h-4 w-4 text-slate-300 transition group-hover:text-[#315bdc]"
+                          />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               </div>
             )}
@@ -514,30 +438,16 @@ export default function ChatAssistant({
           {/* Messages */}
           {!loadingHistory &&
             messages.map((message) => {
-              const isUser = message.role === "user";
-
-              if (isUser) {
+              if (message.role === "user") {
                 return (
-                  <div
-                    key={message.id}
-                    className="flex flex-row-reverse items-start gap-3"
-                  >
-                    <Avatar kind="user" />
+                  <div key={message.id} className="flex flex-col items-end">
+                    <div className="mb-1 flex items-center gap-2 text-xs text-slate-500">
+                      <span className="font-semibold text-slate-700">You</span>
+                      <time dateTime={message.created_at}>{formatTime(message.created_at)}</time>
+                    </div>
 
-                    <div className="flex min-w-0 max-w-[85%] flex-col items-end">
-                      <div className="mb-1.5 flex items-center gap-2 text-xs">
-                        <span className="text-slate-400">
-                          {formatTime(message.created_at)}
-                        </span>
-
-                        <span className="font-semibold text-slate-800">
-                          You
-                        </span>
-                      </div>
-
-                      <div className="whitespace-pre-wrap wrap-break-words rounded-xl rounded-tr-sm bg-[#315bdc] px-4 py-3 text-sm leading-relaxed text-white shadow-sm">
-                        {message.content}
-                      </div>
+                    <div className="max-w-[85%] whitespace-pre-wrap wrap-break-word rounded-lg rounded-tr-sm bg-[#315bdc] px-4 py-2.5 text-sm leading-relaxed text-white">
+                      {message.content}
                     </div>
                   </div>
                 );
@@ -550,81 +460,51 @@ export default function ChatAssistant({
               );
 
               return (
-                <div
-                  key={message.id}
-                  className="flex items-start gap-3"
-                >
-                  <Avatar kind="assistant" />
+                <div key={message.id} className="flex items-start gap-3">
+                  <AssistantMark />
 
                   <div className="min-w-0 flex-1">
-                    <div className="mb-1.5 flex items-center gap-2 text-xs">
-                      <span className="font-semibold text-slate-800">
-                        DocIntel Assistant
-                      </span>
-
-                      <span className="text-slate-400">
-                        {formatTime(message.created_at)}
-                      </span>
+                    <div className="mb-1 flex items-center gap-2 text-xs text-slate-500">
+                      <span className="font-semibold text-slate-700">DocIntel Assistant</span>
+                      <time dateTime={message.created_at}>{formatTime(message.created_at)}</time>
                     </div>
 
-                    <div className="rounded-xl rounded-tl-sm border border-slate-200 bg-white px-4 py-3 text-sm leading-relaxed text-slate-700 shadow-sm">
+                    <div className="rounded-lg rounded-tl-sm border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-700">
                       <MarkdownMessage content={message.content} />
                     </div>
 
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
                       <button
                         type="button"
                         onClick={() => handleCopy(message)}
                         className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 ${focusRing}`}
                       >
                         <Icon
-                          name={
-                            copiedId === message.id
-                              ? "check"
-                              : "copy"
-                          }
-                          className={`h-3.5 w-3.5 ${
-                            copiedId === message.id
-                              ? "text-emerald-600"
-                              : ""
-                          }`}
+                          name={copiedId === message.id ? "check" : "copy"}
+                          className={`h-3.5 w-3.5 ${copiedId === message.id ? "text-emerald-600" : ""}`}
                         />
-
-                        {copiedId === message.id
-                          ? "Copied"
-                          : "Copy"}
+                        {copiedId === message.id ? "Copied" : "Copy answer"}
                       </button>
 
                       {sources.length > 0 && (
-                        <>
-                          <span
-                            aria-hidden="true"
-                            className="h-3 w-px bg-slate-200"
-                          />
-
-                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                            <Icon
-                              name="book"
-                              className="h-3 w-3"
-                            />
+                        <div className="flex flex-wrap items-center gap-2 border-l border-slate-200 pl-3">
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500">
+                            <Icon name="book" className="h-3.5 w-3.5" />
                             Sources
                           </span>
 
                           {sources.map((source, index) => (
                             <span
                               key={`${source.document_id}-${source.page}-${index}`}
-                              className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 shadow-sm"
+                              className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs font-medium text-slate-700"
                             >
-                              <span className="flex h-4 w-4 items-center justify-center rounded bg-blue-50 text-[10px] font-bold text-[#315bdc]">
+                              <span className="flex h-4 w-4 items-center justify-center rounded-sm bg-[#315bdc]/10 text-[10px] font-bold text-[#315bdc]">
                                 {index + 1}
                               </span>
-
-                              {source.page
-                                ? `Page ${source.page}`
-                                : `Document #${source.document_id}`}
+                              {source.page ? `Page ${source.page}` : `Document #${source.document_id}`}
                             </span>
                           ))}
-                        </>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -639,28 +519,23 @@ export default function ChatAssistant({
           {error && (
             <div
               role="alert"
-              className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3"
+              className="flex items-start gap-3 rounded-md border border-red-200 border-l-4 border-l-red-600 bg-red-50/70 px-4 py-3"
             >
-              <Icon
-                name="alert"
-                className="mt-0.5 h-4 w-4 text-red-600"
-              />
+              <Icon name="alert" className="mt-0.5 h-4 w-4 text-red-600" />
 
-              <p className="flex-1 text-sm text-red-700">
-                {error}
-              </p>
+              <div className="flex-1">
+                <p className="text-[13px] font-semibold text-red-900">Couldn&apos;t get an answer</p>
+                <p className="mt-0.5 text-[13px] text-red-800">{error}</p>
+              </div>
 
               {failedQuestion && (
                 <button
                   type="button"
                   onClick={() => void retryQuestion()}
                   disabled={sendingMessage}
-                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-100 disabled:opacity-50 ${focusRing}`}
+                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-md border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50 ${focusRing}`}
                 >
-                  <Icon
-                    name="refresh"
-                    className="h-3.5 w-3.5"
-                  />
+                  <Icon name="refresh" className="h-3.5 w-3.5" />
                   Retry
                 </button>
               )}
@@ -670,22 +545,18 @@ export default function ChatAssistant({
       </div>
 
       {/* Composer */}
-      <div className="shrink-0 border-t border-slate-200 bg-white px-4 py-1.5 sm:px-6">
+      <div className="shrink-0 border-t border-slate-200 bg-white px-4 py-3 sm:px-6">
         <div className="mx-auto w-full max-w-3xl">
-
           {/* Follow-ups */}
           {hasDocument && messages.length > 0 && (
-            <div
-              className="mb-2 flex gap-2 overflow-x-auto pb-1"
-              aria-label="Suggested questions"
-            >
+            <div className="mb-2.5 flex gap-2 overflow-x-auto pb-1" aria-label="Suggested questions">
               {suggestions.map((suggestion) => (
                 <button
                   key={suggestion}
                   type="button"
                   disabled={sendingMessage || loadingHistory}
                   onClick={() => handleSuggestion(suggestion)}
-                  className={`shrink-0 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600 shadow-sm transition hover:border-[#315bdc] hover:text-[#315bdc] disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`}
+                  className={`max-w-65 shrink-0 truncate rounded-md border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 transition hover:border-[#315bdc] hover:text-[#315bdc] disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`}
                 >
                   {suggestion}
                 </button>
@@ -695,10 +566,8 @@ export default function ChatAssistant({
 
           <form ref={formRef} onSubmit={handleSubmit}>
             <div
-              className={`flex items-end gap-2 rounded-lg border p-1 shadow-sm transition focus-within:border-[#315bdc] focus-within:ring-2 focus-within:ring-[#315bdc]/20 ${
-                hasDocument
-                  ? "border-slate-300 bg-white"
-                  : "border-slate-200 bg-slate-50"
+              className={`flex items-end gap-2 rounded-lg border p-1.5 transition focus-within:border-[#315bdc] focus-within:ring-2 focus-within:ring-[#315bdc]/20 ${
+                hasDocument ? "border-slate-300 bg-white" : "border-slate-200 bg-slate-50"
               }`}
             >
               <textarea
@@ -710,48 +579,30 @@ export default function ChatAssistant({
                 disabled={!hasDocument || loadingHistory}
                 aria-label="Ask a question about this document"
                 placeholder={
-                  hasDocument
-                    ? "Ask a question about this document..."
-                    : "Select a document first..."
+                  hasDocument ? "Ask a question about this document..." : "Select a document first..."
                 }
-                className="max-h-32 min-h-8 flex-1 resize-none bg-transparent px-2.5 py-1.5 text-sm leading-5 text-slate-900 placeholder:text-slate-400 focus:outline-none disabled:cursor-not-allowed"
+                className="max-h-40 min-h-9 flex-1 resize-none bg-transparent px-2.5 py-2 text-sm leading-5 text-slate-900 placeholder:text-slate-400 focus:outline-none disabled:cursor-not-allowed"
               />
 
               <button
                 type="submit"
                 disabled={!canSend}
-                aria-label={
-                  sendingMessage
-                    ? "Waiting for answer"
-                    : "Send question"
-                }
-                className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-[#315bdc] px-3 text-sm font-medium text-white shadow-sm transition hover:bg-[#274dc4] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 ${focusRing}`}
+                aria-label={sendingMessage ? "Waiting for answer" : "Send question"}
+                className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md bg-[#315bdc] px-3.5 text-sm font-semibold text-white transition hover:bg-[#274dc4] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 ${focusRing}`}
               >
                 <Icon
                   name={sendingMessage ? "loader" : "send"}
-                  className={`h-4 w-4 ${
-                    sendingMessage
-                      ? "animate-spin motion-reduce:animate-none"
-                      : ""
-                  }`}
+                  className={`h-4 w-4 ${sendingMessage ? "animate-spin motion-reduce:animate-none" : ""}`}
                 />
-
-                <span>
-                  {sendingMessage ? "Thinking..." : "Send"}
-                </span>
+                {sendingMessage ? "Thinking..." : "Send"}
               </button>
             </div>
           </form>
 
-          <p className="mt-1 text-center text-[11px] text-slate-400">
-            Answers are generated from the selected document. Verify
-            critical details.
-
-            <span className="hidden sm:inline">
-              {" "}
-              · Enter to send · Shift + Enter for a new line
-            </span>
-          </p>
+          <div className="mt-2 flex flex-col gap-1 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+            <p className="hidden sm:block">Enter to send. Shift + Enter for a new line.</p>
+            <p>Answers come from the selected document. Verify critical details.</p>
+          </div>
         </div>
       </div>
     </div>

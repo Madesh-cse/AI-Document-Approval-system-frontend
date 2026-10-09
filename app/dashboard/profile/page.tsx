@@ -17,11 +17,6 @@ import {
   getRoleBadgeClass,
 } from "@/lib/userDisplay";
 
-/**
- * Optional default cover shown until the user uploads their own.
- * Put a file in /public and set a path such as "/profile-cover.jpg".
- * With null, a generated blue pattern is used.
- */
 const DEFAULT_COVER_IMAGE_URL: string | null = null;
 
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
@@ -40,6 +35,7 @@ interface ProfileUser {
   created_at?: string;
 }
 
+
 function LineIcon({
   children,
   className = "h-4 w-4",
@@ -49,7 +45,7 @@ function LineIcon({
 }) {
   return (
     <svg
-      className={className}
+      className={`shrink-0 ${className}`}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -63,41 +59,35 @@ function LineIcon({
   );
 }
 
-const NAV_ITEMS: { id: TabId; label: string; icon: ReactNode }[] = [
-  {
-    id: "overview",
-    label: "Overview",
-    icon: (
-      <>
-        <rect x="3" y="3" width="7" height="7" rx="1" />
-        <rect x="14" y="3" width="7" height="7" rx="1" />
-        <rect x="3" y="14" width="7" height="7" rx="1" />
-        <rect x="14" y="14" width="7" height="7" rx="1" />
-      </>
-    ),
-  },
-  {
-    id: "personal",
-    label: "Personal information",
-    icon: (
-      <>
-        <circle cx="12" cy="8" r="4" />
-        <path d="M4 21a8 8 0 0 1 16 0" />
-      </>
-    ),
-  },
-  {
-    id: "security",
-    label: "Security",
-    icon: <path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z" />,
-  },
+const CameraPaths = (
+  <>
+    <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
+    <circle cx="12" cy="13" r="3.5" />
+  </>
+);
+
+const SignOutPaths = (
+  <>
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+    <path d="m16 17 5-5-5-5" />
+    <path d="M21 12H9" />
+  </>
+);
+
+const TABS: { id: TabId; label: string }[] = [
+  { id: "overview", label: "Overview" },
+  { id: "personal", label: "Personal information" },
+  { id: "security", label: "Security and access" },
 ];
+
+const focusRing =
+  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600";
+
 
 function formatDate(value?: string) {
   if (!value) return undefined;
 
   const date = new Date(value);
-
   if (Number.isNaN(date.getTime())) return undefined;
 
   return date.toLocaleDateString("en-IN", {
@@ -137,10 +127,6 @@ function describeDevice() {
   return `${browser} on ${os}`;
 }
 
-/**
- * Crops the image to the target aspect ratio (from the centre), shrinks it
- * to at most the target size (never upscales) and returns a JPEG data URL.
- */
 function processImage(
   file: File,
   targetWidth: number,
@@ -264,6 +250,7 @@ function useStoredImage(storageKey: string) {
   return { image, save, clear };
 }
 
+
 function Avatar({
   src,
   initials,
@@ -276,31 +263,52 @@ function Avatar({
   if (src) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={src}
-        alt="Profile photo"
-        className={`${className} object-cover`}
-      />
+      <img src={src} alt="Profile photo" className={`${className} object-cover`} />
     );
   }
 
   return (
     <div
-      className={`${className} flex items-center justify-center bg-blue-100 font-bold text-blue-600`}
+      className={`${className} flex items-center justify-center bg-slate-800 font-semibold tracking-tight text-white`}
     >
       {initials}
     </div>
   );
 }
 
-function Field({ label, value }: { label: string; value?: string }) {
+function Panel({
+  title,
+  description,
+  action,
+  children,
+}: {
+  title: string;
+  description?: string;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
   return (
-    <div>
-      <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-        {label}
-      </dt>
+    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <header className="flex items-center justify-between gap-4 border-b border-slate-200 px-5 py-3.5">
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
+          {description && (
+            <p className="mt-0.5 text-[13px] text-slate-500">{description}</p>
+          )}
+        </div>
+        {action}
+      </header>
 
-      <dd className="mt-1.5 text-sm">
+      {children}
+    </section>
+  );
+}
+
+function Row({ label, value }: { label: string; value?: ReactNode }) {
+  return (
+    <div className="grid gap-1 px-5 py-3 sm:grid-cols-[200px_minmax(0,1fr)] sm:gap-6">
+      <dt className="text-[13px] text-slate-500">{label}</dt>
+      <dd className="min-w-0 wrap-break-words text-[13px]">
         {value ? (
           <span className="font-medium text-slate-900">{value}</span>
         ) : (
@@ -311,43 +319,26 @@ function Field({ label, value }: { label: string; value?: string }) {
   );
 }
 
-function FactRow({ label, value }: { label: string; value?: string }) {
+function StatusPill({ children }: { children: ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-3 py-2 text-sm">
-      <span className="text-slate-500">{label}</span>
+    <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+      {children}
+    </span>
+  );
+}
 
-      {value ? (
-        <span className="truncate font-medium text-slate-800">{value}</span>
-      ) : (
-        <span className="text-slate-400">Not provided</span>
-      )}
+function SummaryCell({ label, value }: { label: string; value?: ReactNode }) {
+  return (
+    <div className="min-w-0 bg-white px-5 py-4">
+      <dt className="text-xs text-slate-500">{label}</dt>
+      <dd className="mt-1.5 truncate text-sm font-semibold text-slate-900">
+        {value || <span className="font-normal text-slate-400">Not provided</span>}
+      </dd>
     </div>
   );
 }
 
-function Card({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description?: string;
-  children: ReactNode;
-}) {
-  return (
-    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-100 px-6 py-4">
-        <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
-
-        {description && (
-          <p className="mt-0.5 text-xs text-slate-400">{description}</p>
-        )}
-      </div>
-
-      <div className="p-6">{children}</div>
-    </section>
-  );
-}
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -397,9 +388,7 @@ export default function ProfilePage() {
 
   const handlePhotoChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-
     event.target.value = "";
-
     if (!file) return;
 
     setPhotoMessage("");
@@ -414,9 +403,7 @@ export default function ProfilePage() {
           : "Photo updated for this session only.",
       );
     } catch (error) {
-      setPhotoError(
-        error instanceof Error ? error.message : "Unable to use this image.",
-      );
+      setPhotoError(error instanceof Error ? error.message : "Unable to use this image.");
     }
   };
 
@@ -428,22 +415,14 @@ export default function ProfilePage() {
 
   const handleCoverChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-
     event.target.value = "";
-
     if (!file) return;
 
     setCoverMessage("");
     setCoverError("");
 
     try {
-      const dataUrl = await prepareImage(
-        file,
-        MAX_COVER_BYTES,
-        1920,
-        600,
-        0.82,
-      );
+      const dataUrl = await prepareImage(file, MAX_COVER_BYTES, 1920, 600, 0.82);
 
       setCoverMessage(
         coverStore.save(dataUrl)
@@ -451,9 +430,7 @@ export default function ProfilePage() {
           : "Cover updated for this session only.",
       );
     } catch (error) {
-      setCoverError(
-        error instanceof Error ? error.message : "Unable to use this image.",
-      );
+      setCoverError(error instanceof Error ? error.message : "Unable to use this image.");
     }
   };
 
@@ -467,123 +444,115 @@ export default function ProfilePage() {
 
   const coverStyle = coverImage
     ? {
-        backgroundImage: `linear-gradient(180deg, rgba(15,23,42,0.55) 0%, rgba(15,23,42,0.1) 55%, rgba(15,23,42,0.3) 100%), url("${coverImage}")`,
+        backgroundImage: `linear-gradient(180deg, rgba(15,23,42,0.5) 0%, rgba(15,23,42,0.1) 60%, rgba(15,23,42,0.3) 100%), url("${coverImage}")`,
         backgroundSize: "cover",
         backgroundPosition: "center",
       }
     : {
-        backgroundImage:
-          "linear-gradient(120deg, #1e3a8a 0%, #1d4ed8 55%, #3b82f6 100%)",
+        backgroundImage: "linear-gradient(115deg, #0f172a 0%, #1e3a8a 60%, #2563eb 100%)",
       };
+
+  /* ---------------------------- Loading state ----------------------------- */
 
   if (!user) {
     return (
-      <div className="min-h-full bg-slate-50 scheme:light">
-        <div className="animate-pulse">
-          <div className="h-48 w-full bg-slate-200 sm:h-56 lg:h-64" />
+      <div className="min-h-full bg-[#f5f6f8] scheme:light">
+        <div role="status" aria-busy="true" aria-label="Loading profile" className="animate-pulse motion-reduce:animate-none">
+          <div className="h-36 w-full bg-slate-200 sm:h-44" />
 
-          <div className="mx-auto mt-6 grid max-w-6xl grid-cols-1 gap-6 px-4 sm:px-6 lg:grid-cols-[300px_minmax(0,1fr)]">
-            <div className="h-96 rounded-xl border border-slate-200 bg-white" />
-            <div className="h-96 rounded-xl border border-slate-200 bg-white" />
+          <div className="mx-auto -mt-12 max-w-6xl space-y-6 px-4 sm:px-6">
+            <div className="h-36 rounded-lg border border-slate-200 bg-white" />
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="h-80 rounded-lg border border-slate-200 bg-white" />
+              <div className="h-80 rounded-lg border border-slate-200 bg-white" />
+            </div>
           </div>
         </div>
       </div>
     );
   }
 
+  /* ------------------------------ Derived data ---------------------------- */
+
   const fullName = user.full_name || "User";
   const role = user.role || "employee";
   const displayRole = formatRole(role);
   const initials = getInitials(fullName);
+  const canReviewDocuments = role === "admin" || role === "manager";
 
   const completed = profileFields.filter((field) => field.value).length;
   const percent = Math.round((completed / profileFields.length) * 100);
-  const missing = profileFields
-    .filter((field) => !field.value)
-    .map((field) => field.label);
+  const barColor =
+    percent === 100 ? "bg-emerald-500" : percent >= 60 ? "bg-blue-600" : "bg-amber-500";
+
+  const roleBadge = (
+    <span
+      className={`inline-flex rounded-md border px-2 py-0.5 text-xs font-semibold ${getRoleBadgeClass(role)}`}
+    >
+      {displayRole}
+    </span>
+  );
+
+  const accessItems = [
+    { label: "View and manage your own documents", allowed: true },
+    { label: "Approve or reject documents in review", allowed: canReviewDocuments },
+  ];
+
+  /* -------------------------------- Render -------------------------------- */
 
   return (
-    <div className="min-h-full bg-slate-50 text-slate-900 scheme:light">
-      {/* Cover (full width) */}
-      <div
-        className="relative h-48 w-full overflow-hidden sm:h-56 lg:h-64"
-        style={coverStyle}
-      >
+    <div className="min-h-full bg-[#f5f6f8] text-slate-900 antialiased scheme:light">
+      {/* Cover */}
+      <div className="relative h-36 w-full overflow-hidden sm:h-44" style={coverStyle}>
         {!coverImage && (
           <svg className="absolute inset-0 h-full w-full" aria-hidden="true">
             <defs>
-              <pattern
-                id="cover-dots"
-                width="24"
-                height="24"
-                patternUnits="userSpaceOnUse"
-              >
-                <circle cx="2" cy="2" r="1.2" fill="white" fillOpacity="0.18" />
+              <pattern id="cover-grid" width="32" height="32" patternUnits="userSpaceOnUse">
+                <path d="M32 0H0V32" fill="none" stroke="white" strokeOpacity="0.08" />
               </pattern>
             </defs>
-
-            <rect width="100%" height="100%" fill="url(#cover-dots)" />
-            <circle
-              cx="88%"
-              cy="-10%"
-              r="180"
-              fill="white"
-              fillOpacity="0.07"
-            />
-            <circle
-              cx="72%"
-              cy="120%"
-              r="140"
-              fill="white"
-              fillOpacity="0.07"
-            />
+            <rect width="100%" height="100%" fill="url(#cover-grid)" />
           </svg>
         )}
 
-        <div className="relative mx-auto h-full max-w-6xl px-4 sm:px-6">
-          <div className="pt-5 text-white">
-            <h1 className="text-xl font-semibold">Profile</h1>
-
-            <p className="mt-1 text-sm text-white/80">
-              Your account details and access information.
+        <div className="relative mx-auto flex h-full max-w-6xl items-start justify-between gap-4 px-4 pt-5 sm:px-6">
+          <div className="text-white">
+            <h1 className="text-lg font-semibold tracking-tight">My profile</h1>
+            <p className="mt-0.5 text-[13px] text-white/75">
+              Your account details, access and security.
             </p>
           </div>
 
-          <div className="absolute bottom-4 right-4 flex flex-col items-end gap-2 sm:right-6">
-            <div aria-live="polite">
-              {coverError ? (
-                <span className="rounded-md bg-red-600/90 px-2.5 py-1 text-xs text-white">
-                  {coverError}
-                </span>
-              ) : coverMessage ? (
-                <span className="rounded-md bg-slate-900/60 px-2.5 py-1 text-xs text-white backdrop-blur">
-                  {coverMessage}
-                </span>
-              ) : null}
-            </div>
-
+          <div className="flex flex-col items-end gap-2">
             <div className="flex items-center gap-2">
               {coverStore.image && (
                 <button
                   type="button"
                   onClick={handleRemoveCover}
-                  className="rounded-lg border border-white/30 bg-white/15 px-3 py-2 text-xs font-medium text-white backdrop-blur transition-colors hover:bg-white/25"
+                  className={`rounded-md border border-white/25 bg-black/20 px-3 py-1.5 text-xs font-medium text-white backdrop-blur transition hover:bg-black/30 ${focusRing}`}
                 >
-                  Remove
+                  Remove cover
                 </button>
               )}
 
               <button
                 type="button"
                 onClick={() => coverInputRef.current?.click()}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-white/30 bg-white/15 px-3 py-2 text-xs font-medium text-white backdrop-blur transition-colors hover:bg-white/25"
+                className={`inline-flex items-center gap-1.5 rounded-md border border-white/25 bg-black/20 px-3 py-1.5 text-xs font-medium text-white backdrop-blur transition hover:bg-black/30 ${focusRing}`}
               >
-                <LineIcon>
-                  <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
-                  <circle cx="12" cy="13" r="3.5" />
-                </LineIcon>
-                {coverStore.image ? "Change cover" : "Add cover image"}
+                <LineIcon className="h-3.5 w-3.5">{CameraPaths}</LineIcon>
+                {coverStore.image ? "Change cover" : "Add cover"}
               </button>
+            </div>
+
+            <div aria-live="polite" className="min-h-5">
+              {coverError ? (
+                <span className="rounded bg-red-600 px-2 py-0.5 text-xs text-white">{coverError}</span>
+              ) : coverMessage ? (
+                <span className="rounded bg-black/40 px-2 py-0.5 text-xs text-white backdrop-blur">
+                  {coverMessage}
+                </span>
+              ) : null}
             </div>
           </div>
 
@@ -597,323 +566,290 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <div className="relative z-10 mx-auto max-w-6xl px-4 pb-8 sm:px-6">
-        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
-          {/* Sidebar */}
-          <aside className="lg:sticky lg:top-24 lg:self-start">
-            <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-              <div className="px-6 pb-5">
-                <div className="-mt-14 flex justify-center">
-                  <div className="relative">
-                    <Avatar
-                      src={avatarStore.image}
-                      initials={initials}
-                      className="h-28 w-28 rounded-full text-3xl shadow ring-4 ring-white"
-                    />
+      <div className="relative z-10 mx-auto max-w-6xl space-y-6 px-4 pb-10 sm:px-6">
+        {/* Identity card with tabs */}
+        <section className="-mt-14 rounded-lg border border-slate-200 bg-white shadow-sm sm:-mt-16">
+          <div className="flex flex-col gap-5 px-5 pt-5 sm:flex-row sm:items-end sm:justify-between sm:px-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-5">
+              <div className="-mt-14 shrink-0 sm:-mt-16">
+                <div className="relative w-fit">
+                  <Avatar
+                    src={avatarStore.image}
+                    initials={initials}
+                    className="h-24 w-24 rounded-full text-2xl shadow-sm ring-4 ring-white sm:h-28 sm:w-28 sm:text-3xl"
+                  />
 
-                    <button
-                      type="button"
-                      onClick={() => photoInputRef.current?.click()}
-                      aria-label="Change profile photo"
-                      className="absolute bottom-1 right-1 flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white shadow ring-2 ring-white transition-colors hover:bg-blue-700"
-                    >
-                      <LineIcon>
-                        <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
-                        <circle cx="12" cy="13" r="3.5" />
-                      </LineIcon>
-                    </button>
+                  <button
+                    type="button"
+                    onClick={() => photoInputRef.current?.click()}
+                    aria-label="Change profile photo"
+                    className={`absolute bottom-0.5 right-0.5 flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50 ${focusRing}`}
+                  >
+                    <LineIcon>{CameraPaths}</LineIcon>
+                  </button>
 
-                    <input
-                      ref={photoInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handlePhotoChange}
-                      className="hidden"
-                    />
-                  </div>
+                  <input
+                    ref={photoInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoChange}
+                    className="hidden"
+                  />
                 </div>
+              </div>
 
-                <div className="mt-4 text-center">
-                  <h2 className="truncate text-lg font-semibold text-slate-900">
+              <div className="min-w-0 pb-1">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <h2 className="truncate text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
                     {fullName}
                   </h2>
+                  {roleBadge}
+                  <StatusPill>Active</StatusPill>
+                </div>
 
-                  {user.email && (
-                    <p className="mt-0.5 truncate text-sm text-slate-500">
-                      {user.email}
-                    </p>
-                  )}
+                <p className="mt-1 truncate text-[13px] text-slate-500">
+                  {[user.email, user.department].filter(Boolean).join("  |  ") ||
+                    "No contact details on file"}
+                </p>
 
-                  <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-                    <span
-                      className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${getRoleBadgeClass(
-                        role,
-                      )}`}
-                    >
-                      {displayRole}
-                    </span>
-
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                      Active
-                    </span>
-                  </div>
-
-                  <div className="mt-3 min-h-4 text-xs" aria-live="polite">
-                    {photoError ? (
-                      <span className="text-red-600">{photoError}</span>
-                    ) : photoMessage ? (
-                      <span className="text-slate-500">{photoMessage}</span>
-                    ) : null}
-                  </div>
+                <div className="mt-1.5 flex min-h-5 flex-wrap items-center gap-x-3 text-xs" aria-live="polite">
+                  {photoError ? (
+                    <span className="text-red-600">{photoError}</span>
+                  ) : photoMessage ? (
+                    <span className="text-slate-500">{photoMessage}</span>
+                  ) : null}
 
                   {avatarStore.image && (
                     <button
                       type="button"
                       onClick={handleRemovePhoto}
-                      className="mt-1 text-xs font-medium text-slate-500 hover:text-red-600"
+                      className={`rounded font-medium text-slate-500 hover:text-red-600 ${focusRing}`}
                     >
                       Remove photo
                     </button>
                   )}
                 </div>
-
-                <div className="mt-4 divide-y divide-slate-100 border-t border-slate-100">
-                  <FactRow label="Department" value={user.department} />
-                  <FactRow label="Employee ID" value={user.employee_id} />
-                  <FactRow
-                    label="Member since"
-                    value={formatDate(user.created_at)}
-                  />
-                </div>
-              </div>
-
-              <nav
-                aria-label="Profile sections"
-                className="border-t border-slate-100 p-2"
-              >
-                {NAV_ITEMS.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setActiveTab(item.id)}
-                    aria-current={activeTab === item.id ? "page" : undefined}
-                    className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                      activeTab === item.id
-                        ? "bg-blue-50 text-blue-700"
-                        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                    }`}
-                  >
-                    <LineIcon>{item.icon}</LineIcon>
-                    {item.label}
-                  </button>
-                ))}
-              </nav>
-
-              <div className="border-t border-slate-100 p-2">
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
-                >
-                  <LineIcon>
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                    <path d="m16 17 5-5-5-5" />
-                    <path d="M21 12H9" />
-                  </LineIcon>
-                  Sign out
-                </button>
               </div>
             </div>
-          </aside>
 
-          {/* Content */}
+            <button
+              type="button"
+              onClick={handleLogout}
+              className={`inline-flex items-center justify-center gap-2 self-start rounded-md border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 transition hover:border-red-300 hover:bg-red-50 hover:text-red-700 sm:self-auto ${focusRing}`}
+            >
+              <LineIcon>{SignOutPaths}</LineIcon>
+              Sign out
+            </button>
+          </div>
+
+          <div
+            role="tablist"
+            aria-label="Profile sections"
+            className="mt-4 flex gap-6 overflow-x-auto border-t border-slate-200 px-5 sm:px-6"
+          >
+            {TABS.map((tab) => {
+              const selected = activeTab === tab.id;
+
+              return (
+                <button
+                  key={tab.id}
+                  id={`tab-${tab.id}`}
+                  role="tab"
+                  type="button"
+                  aria-selected={selected}
+                  aria-controls={`panel-${tab.id}`}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`-mb-px whitespace-nowrap border-b-2 py-3 text-sm font-semibold transition ${focusRing} ${
+                    selected
+                      ? "border-blue-600 text-slate-900"
+                      : "border-transparent text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* Body */}
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
           <main className="min-w-0 space-y-6">
             {activeTab === "overview" && (
-              <>
-                <Card
-                  title="Profile completeness"
-                  description="How much of your profile is filled in."
-                >
-                  <div className="flex items-end justify-between">
-                    <p className="text-sm text-slate-600">
-                      <span className="font-semibold text-slate-900">
-                        {completed} of {profileFields.length}
-                      </span>{" "}
-                      details provided
-                    </p>
+              <div id="panel-overview" role="tabpanel" aria-labelledby="tab-overview" className="space-y-6">
+                <dl className="grid gap-px overflow-hidden rounded-lg border border-slate-200 bg-slate-200 sm:grid-cols-2 xl:grid-cols-4">
+                  <SummaryCell label="Role" value={displayRole} />
+                  <SummaryCell label="Department" value={user.department} />
+                  <SummaryCell label="Employee ID" value={user.employee_id} />
+                  <SummaryCell label="Member since" value={formatDate(user.created_at)} />
+                </dl>
 
-                    <p className="text-2xl font-semibold text-slate-900">
-                      {percent}%
-                    </p>
-                  </div>
-
-                  <div
-                    className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100"
-                    role="progressbar"
-                    aria-valuenow={percent}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-label="Profile completeness"
-                  >
-                    <div
-                      className="h-full rounded-full bg-blue-600 transition-all"
-                      style={{ width: `${percent}%` }}
-                    />
-                  </div>
-
-                  {missing.length > 0 ? (
-                    <div className="mt-4">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Missing
-                      </p>
-
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {missing.map((label) => (
-                          <span
-                            key={label}
-                            className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-600"
-                          >
-                            {label}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="mt-4 text-xs text-emerald-600">
-                      Your profile is complete.
-                    </p>
-                  )}
-                </Card>
-
-                <Card
-                  title="Account summary"
-                  description="Access details for your account."
-                >
-                  <dl className="grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2">
-                    <div>
-                      <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Role
-                      </dt>
-
-                      <dd className="mt-1.5">
-                        <span
-                          className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${getRoleBadgeClass(
-                            role,
-                          )}`}
-                        >
-                          {displayRole}
-                        </span>
-                      </dd>
-                    </div>
-
-                    <div>
-                      <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Status
-                      </dt>
-
-                      <dd className="mt-1.5">
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                          Active
-                        </span>
-                      </dd>
-                    </div>
-
-                    <Field
+                <Panel title="Account summary" description="Access details for your account.">
+                  <dl className="divide-y divide-slate-100">
+                    <Row label="Role" value={roleBadge} />
+                    <Row label="Status" value={<StatusPill>Active</StatusPill>} />
+                    <Row
                       label="Account ID"
                       value={user.id !== undefined ? `#${user.id}` : undefined}
                     />
-
-                    <Field
-                      label="Member since"
-                      value={formatDate(user.created_at)}
-                    />
+                    <Row label="Email address" value={user.email} />
                   </dl>
-                </Card>
-              </>
+                </Panel>
+              </div>
             )}
 
             {activeTab === "personal" && (
-              <Card
-                title="Personal information"
-                description="Details linked to your account."
-              >
-                <dl className="grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2">
-                  {profileFields.map((field) => (
-                    <Field
-                      key={field.label}
-                      label={field.label}
-                      value={field.value}
-                    />
-                  ))}
-                </dl>
+              <div id="panel-personal" role="tabpanel" aria-labelledby="tab-personal">
+                <Panel title="Personal information" description="Details linked to your account.">
+                  <dl className="divide-y divide-slate-100">
+                    {profileFields.map((field) => (
+                      <Row key={field.label} label={field.label} value={field.value} />
+                    ))}
+                  </dl>
 
-                <p className="mt-6 border-t border-slate-100 pt-4 text-xs text-slate-400">
-                  These details are read-only. Contact your administrator to
-                  request changes.
-                </p>
-              </Card>
+                  <p className="border-t border-slate-200 bg-slate-50/60 px-5 py-3 text-xs text-slate-500">
+                    These details are read-only. Contact your administrator to request changes.
+                  </p>
+                </Panel>
+              </div>
             )}
 
             {activeTab === "security" && (
-              <>
-                <Card
-                  title="Current session"
-                  description="The device you are signed in on right now."
-                >
-                  <div className="flex items-start gap-4">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+              <div id="panel-security" role="tabpanel" aria-labelledby="tab-security" className="space-y-6">
+                <Panel title="Current session" description="The device you are signed in on right now.">
+                  <div className="flex items-start gap-4 p-5">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-600">
                       <LineIcon className="h-5 w-5">
                         <rect x="3" y="4" width="18" height="12" rx="2" />
                         <path d="M8 20h8M12 16v4" />
                       </LineIcon>
-                    </div>
+                    </span>
 
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-slate-900">
-                        {device || "This device"}
-                      </p>
-
-                      <p className="mt-0.5 text-xs text-slate-500">
-                        {timeZone
-                          ? `Time zone: ${timeZone}`
-                          : "Time zone unavailable"}
+                      <p className="text-sm font-semibold text-slate-900">{device || "This device"}</p>
+                      <p className="mt-0.5 text-[13px] text-slate-500">
+                        {timeZone ? `Time zone: ${timeZone}` : "Time zone unavailable"}
                       </p>
                     </div>
 
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                      Active now
-                    </span>
+                    <StatusPill>Active now</StatusPill>
                   </div>
-                </Card>
+                </Panel>
 
-                <Card
-                  title="Sign out"
-                  description="End your session on this device."
-                >
-                  <p className="text-sm leading-relaxed text-slate-600">
-                    Sign out when you use a shared or public computer so
-                    nobody else can open your documents.
+                <Panel title="Access and permissions" description="What your role lets you do.">
+                  <ul className="divide-y divide-slate-100">
+                    {accessItems.map((item) => (
+                      <li key={item.label} className="flex items-center justify-between gap-4 px-5 py-3">
+                        <span className="text-[13px] font-medium text-slate-900">{item.label}</span>
+
+                        <span
+                          className={`inline-flex shrink-0 items-center gap-1.5 text-xs font-semibold ${
+                            item.allowed ? "text-emerald-700" : "text-slate-400"
+                          }`}
+                        >
+                          <LineIcon className="h-3.5 w-3.5">
+                            {item.allowed ? <path d="m5 12 5 5L20 7" /> : <path d="M18 6 6 18M6 6l12 12" />}
+                          </LineIcon>
+                          {item.allowed ? "Allowed" : "Not allowed"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <p className="border-t border-slate-200 bg-slate-50/60 px-5 py-3 text-xs text-slate-500">
+                    Permissions come from your role. Contact your administrator to change them.
                   </p>
+                </Panel>
 
-                  <button
-                    type="button"
-                    onClick={handleLogout}
-                    className="mt-4 inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
-                  >
-                    <LineIcon>
-                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                      <path d="m16 17 5-5-5-5" />
-                      <path d="M21 12H9" />
-                    </LineIcon>
-                    Sign out of this device
-                  </button>
-                </Card>
-              </>
+                <Panel title="Sign out" description="End your session on this device.">
+                  <div className="p-5">
+                    <p className="max-w-prose text-[13px] leading-6 text-slate-600">
+                      Sign out when you use a shared or public computer so nobody else can open your
+                      documents.
+                    </p>
+
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className={`mt-4 inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-red-700 transition hover:border-red-300 hover:bg-red-50 ${focusRing}`}
+                    >
+                      <LineIcon>{SignOutPaths}</LineIcon>
+                      Sign out of this device
+                    </button>
+                  </div>
+                </Panel>
+              </div>
             )}
           </main>
+
+          {/* Side rail */}
+          <aside className="min-w-0 space-y-6">
+            <Panel
+              title="Profile completeness"
+              description="How much of your profile is filled in."
+              action={
+                <span className="text-lg font-semibold tabular-nums text-slate-900">{percent}%</span>
+              }
+            >
+              <div className="px-5 pt-4">
+                <div
+                  className="h-1.5 overflow-hidden rounded-full bg-slate-100"
+                  role="progressbar"
+                  aria-valuenow={percent}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label="Profile completeness"
+                >
+                  <div
+                    className={`h-full rounded-full transition-all motion-reduce:transition-none ${barColor}`}
+                    style={{ width: `${percent}%` }}
+                  />
+                </div>
+
+                <p className="mt-2 text-xs text-slate-500">
+                  {completed} of {profileFields.length} details provided
+                </p>
+              </div>
+
+              <ul className="mt-2 divide-y divide-slate-100 px-5 pb-1">
+                {profileFields.map((field) => (
+                  <li key={field.label} className="flex items-center gap-3 py-2.5">
+                    <span
+                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
+                        field.value ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-400"
+                      }`}
+                    >
+                      <LineIcon className="h-3 w-3">
+                        {field.value ? <path d="m5 12 5 5L20 7" /> : <path d="M6 12h12" />}
+                      </LineIcon>
+                      <span className="sr-only">{field.value ? "Provided" : "Missing"}</span>
+                    </span>
+
+                    <span
+                      className={`text-[13px] ${
+                        field.value ? "font-medium text-slate-900" : "text-slate-500"
+                      }`}
+                    >
+                      {field.label}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+
+              {percent < 100 && (
+                <p className="border-t border-slate-200 bg-slate-50/60 px-5 py-3 text-xs text-slate-500">
+                  Missing details can only be added by your administrator.
+                </p>
+              )}
+            </Panel>
+
+            <Panel title="Photo and cover" description="Where your images are kept.">
+              <p className="px-5 py-4 text-[13px] leading-6 text-slate-600">
+                Your profile photo and cover are stored in this browser only. They won&apos;t appear
+                on other devices or to other people.
+              </p>
+            </Panel>
+          </aside>
         </div>
       </div>
     </div>

@@ -17,6 +17,15 @@ Built with Next.js, TypeScript, and Tailwind CSS, the application enables users 
 - **Audit & Tracking:** Access workflow information and approval history where supported by the backend.
 - **Responsive UI:** Responsive layouts built with Tailwind CSS.
 
+## Application Image
+![image alt](https://github.com/Madesh-cse/AI-Document-Approval-system-frontend/blob/b4782a1cc3063b21cf5f443583bfb9f936b9cb57/register-image.png)
+![image alt](https://github.com/Madesh-cse/AI-Document-Approval-system-frontend/blob/c9876ec21475f6d824e2bdfb880e227ad756b0c7/login-image.png)
+![image alt](https://github.com/Madesh-cse/AI-Document-Approval-system-frontend/blob/8e7323cd21a877965db641e75cf7e650921b44d2/dashboard-image.png)
+![image alt](https://github.com/Madesh-cse/AI-Document-Approval-system-frontend/blob/a56f7041596dc0511480c88c32ac094405e169d7/document-list-image.png)
+![image alt](https://github.com/Madesh-cse/AI-Document-Approval-system-frontend/blob/7d2a0cc46e5697377ce66f34d764a1bab6564fa7/document_upload-image.png)
+![image alt](https://github.com/Madesh-cse/AI-Document-Approval-system-frontend/blob/1c2f3c57fedf695146d771fe99406a52b39a1927/dashboard_Q-A-image.png)
+![image alt](https://github.com/Madesh-cse/AI-Document-Approval-system-frontend/blob/19b86913833e4aae6b5e1cf5804cad511f630acd/dashboard_audit-image.png)
+
 ## Technology Stack
 
 | Technology | Purpose |

@@ -71,8 +71,8 @@ frontend/
 ### 1. Clone the Repository
 
 ```bash
-git clone <frontend-repository-url>
-cd <frontend-directory>
+git clone https://github.com/Madesh-cse/AI-Document-Approval-system-frontend
+cd frontend
 ```
 
 ### 2. Install Dependencies
